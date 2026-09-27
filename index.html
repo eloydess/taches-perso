@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Tâches</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icone-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#FFFFFF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tâches">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+:root{--pharma:#2E7D32;--pharma-bg:#E8F5E9;--maison:#1F4E79;--maison-bg:#E3F2FD;--rouge:#C62828;--orange:#EF6C00;--gris:#757575;--fond:#F4F5F7;--carte:#fff;--texte:#1a1a1a;--bord:#E0E0E0}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--fond);color:var(--texte);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;-webkit-text-size-adjust:100%}
+body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--bord);padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:17px;margin:0;font-weight:700}
+header .sous{font-size:12px;color:var(--gris)}
+main{padding:12px 12px 20px}
+.ecran{display:none}.ecran.actif{display:block}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--bord);display:flex;justify-content:space-around;padding:6px 0 calc(6px + env(safe-area-inset-bottom));z-index:6}
+nav button{background:none;border:0;font-size:11px;color:var(--gris);display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 8px;min-width:56px}
+nav button .ico{font-size:20px;line-height:1}
+nav button.actif{color:var(--texte);font-weight:700}
+nav button .badge{position:absolute;margin-left:26px;margin-top:-4px;background:var(--rouge);color:#fff;font-size:10px;border-radius:9px;padding:1px 5px;font-weight:700}
+.fab{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:28px;background:var(--texte);color:#fff;font-size:30px;border:0;box-shadow:0 4px 12px rgba(0,0,0,.25);z-index:6;display:flex;align-items:center;justify-content:center}
+.carte{background:var(--carte);border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.titre-section{font-size:13px;font-weight:700;color:var(--gris);text-transform:uppercase;letter-spacing:.4px;margin:14px 4px 8px}
+.item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #F0F0F0;align-items:flex-start}
+.item:last-child{border-bottom:0}
+.item .barre{width:5px;border-radius:3px;align-self:stretch;flex-shrink:0}
+.item .corps{flex:1;min-width:0}
+.item .t{font-weight:600;line-height:1.25}
+.item .m{font-size:12px;color:var(--gris);margin-top:3px}
+.item .m .retard{color:var(--rouge);font-weight:700}
+.item .m .bloque{color:var(--orange);font-weight:700}
+.item .score{font-size:12px;font-weight:700;color:#fff;background:var(--gris);border-radius:8px;padding:2px 7px;align-self:center;flex-shrink:0}
+.item .score.q1{background:var(--rouge)}.item .score.q2{background:var(--maison)}.item .score.q3{background:var(--orange)}.item .score.q4{background:#9E9E9E}
+.item.fini .t{text-decoration:line-through;color:var(--gris)}
+.prog{height:4px;background:#EEE;border-radius:2px;margin-top:6px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--pharma)}
+.P .prog i{background:var(--pharma)}.M .prog i{background:var(--maison)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;-webkit-overflow-scrolling:touch}
+.chip{flex-shrink:0;border:1px solid var(--bord);background:#fff;border-radius:16px;padding:6px 12px;font-size:13px;color:var(--texte)}
+.chip.actif{background:var(--texte);color:#fff;border-color:var(--texte)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.stats div{background:#fff;border-radius:10px;padding:8px 4px;text-align:center}
+.stats b{display:block;font-size:20px}.stats span{font-size:11px;color:var(--gris)}
+.stats .r b{color:var(--rouge)}.stats .o b{color:var(--orange)}
+input,select,textarea{width:100%;font-size:16px;padding:10px;border:1px solid var(--bord);border-radius:10px;background:#fff;color:var(--texte);font-family:inherit}
+textarea{min-height:80px;resize:vertical}
+label{display:block;font-size:12px;color:var(--gris);margin:10px 0 4px;font-weight:600}
+.seg{display:flex;border:1px solid var(--bord);border-radius:10px;overflow:hidden;background:#fff}
+.seg button{flex:1;border:0;background:none;padding:10px 4px;font-size:13px;color:var(--gris);border-right:1px solid var(--bord)}
+.seg button:last-child{border-right:0}
+.seg button.actif{background:var(--texte);color:#fff;font-weight:700}
+.seg.dom button.actif.P{background:var(--pharma)}.seg.dom button.actif.M{background:var(--maison)}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:13px;font-size:15px;font-weight:700;background:var(--texte);color:#fff;margin-top:12px}
+.btn.sec{background:#fff;color:var(--texte);border:1px solid var(--bord)}
+.btn.danger{background:#fff;color:var(--rouge);border:1px solid #F5C6C6}
+.btn.petit{padding:9px;font-size:13px;margin-top:8px}
+.ligne-btn{display:flex;gap:8px}.ligne-btn .btn{flex:1}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:none;align-items:flex-end}
+.modal.ouvert{display:flex}
+.feuille{background:var(--fond);width:100%;max-height:92vh;overflow-y:auto;border-radius:18px 18px 0 0;padding:10px 14px calc(24px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
+.poignee{width:40px;height:4px;background:#CCC;border-radius:2px;margin:0 auto 10px}
+.feuille h2{font-size:18px;margin:6px 0 10px;line-height:1.25}
+.entete-detail{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--gris)}
+.pastille{border-radius:8px;padding:2px 8px;font-size:12px;font-weight:700;color:#fff;background:var(--gris)}
+.pastille.P{background:var(--pharma)}.pastille.M{background:var(--maison)}
+.sous{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F0F0F0}
+.sous input[type=checkbox]{width:22px;height:22px;flex-shrink:0}
+.sous span{flex:1;font-size:14px}.sous span.fait{text-decoration:line-through;color:var(--gris)}
+.sous button{border:0;background:none;color:var(--gris);font-size:18px}
+.pj a{display:block;font-size:13px;padding:6px 0;color:var(--maison);text-decoration:none;word-break:break-all}
+.note{padding:10px 0;border-bottom:1px solid #F0F0F0}
+.note .en-tete{font-size:12px;color:var(--gris);display:flex;gap:8px;align-items:center}
+.note .contenu{margin-top:4px;white-space:pre-wrap;line-height:1.35}
+.note.traitee .contenu{color:var(--gris)}
+.note .actions{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.note .actions button{border:1px solid var(--bord);background:#fff;border-radius:8px;padding:5px 9px;font-size:12px}
+.note .actions a{border:1px solid var(--bord);background:#fff;border-radius:8px;padding:5px 9px;font-size:12px;text-decoration:none;color:var(--maison)}
+.vide{color:var(--gris);text-align:center;padding:24px 8px;font-size:14px}
+.chargement{position:fixed;inset:0;background:rgba(255,255,255,.7);z-index:50;display:none;align-items:center;justify-content:center;font-weight:700;color:var(--gris)}
+.chargement.ouvert{display:flex}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(100px + env(safe-area-inset-bottom));background:#323232;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:60;display:none;max-width:90%}
+.enreg{display:flex;align-items:center;gap:10px;background:#FFEBEE;border:1px solid #F5C6C6;border-radius:10px;padding:10px;margin-top:8px}
+.enreg .pt{width:12px;height:12px;border-radius:6px;background:var(--rouge);animation:cl 1s infinite}
+@keyframes cl{50%{opacity:.2}}
+.aide{font-size:12px;color:var(--gris);margin-top:6px;line-height:1.35}
+.recap{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.recap .c{border-radius:10px;padding:10px;color:#fff}
+.recap .c.P{background:var(--pharma)}.recap .c.M{background:var(--maison)}
+.recap .c b{font-size:22px;display:block}.recap .c span{font-size:12px;opacity:.9}
+.recap .c small{display:block;font-size:12px;margin-top:6px;opacity:.95}
+.range{display:flex;align-items:center;gap:10px}.range input{padding:0}.range b{width:44px;text-align:right}
+.icone-btn{display:flex;gap:8px;margin-top:10px}
+.icone-btn button{flex:1;border:1px solid var(--bord);background:#fff;border-radius:12px;padding:10px 4px;font-size:12px;color:var(--texte)}
+.icone-btn button b{display:block;font-size:20px;margin-bottom:2px}
+.masque{display:none}
+</style>
+</head>
+<body>
+<header><div><h1 id="h-titre">Suivi tâches</h1><div class="sous" id="h-sous"></div></div><button class="chip" id="btn-utilisateur">…</button></header>
+<main>
+<div class="seg" id="vue" style="margin-bottom:10px"></div>
+
+<!-- ============================ JOUR ============================ -->
+<section class="ecran actif" id="ecran-jour">
+  <div class="recap" id="recap"></div>
+  <div id="jour-liste"></div>
+</section>
+
+<!-- ============================ DOMAINE (Pharmacie / Maison) ============================ -->
+<section class="ecran" id="ecran-domaine">
+  <div class="stats" id="dom-stats"></div>
+  <input type="search" id="dom-recherche" placeholder="Rechercher une tâche…">
+  <div class="chips" id="dom-chips" style="margin-top:8px"></div>
+  <div style="display:flex;gap:8px">
+    <select id="dom-categorie"><option value="">Toutes les catégories</option></select>
+    <select id="dom-tri" style="width:44%"><option value="score">Tri : priorité</option><option value="echeance">Tri : échéance</option><option value="recent">Tri : récent</option></select>
+  </div>
+  <div class="carte" id="dom-liste" style="margin-top:10px"></div>
+</section>
+
+<!-- ============================ NOTES ============================ -->
+<section class="ecran" id="ecran-notes">
+  <div class="carte">
+    <div class="seg dom" id="note-dom"><button class="P actif" data-v="Pharmacie">Pharmacie</button><button class="M" data-v="Maison">Maison</button></div>
+    <textarea id="note-texte" placeholder="Écrivez ou dictez (micro du clavier) une note, une idée, une chose à commander…" style="margin-top:8px"></textarea>
+    <div class="ligne-btn"><button class="btn petit" id="note-enregistrer">Enregistrer la note</button></div>
+    <div class="icone-btn">
+      <button id="note-photo"><b>📷</b>Photo</button>
+      <button id="note-audio"><b>🎙️</b>Mémo audio</button>
+      <button id="note-doc"><b>📎</b>Document</button>
+    </div>
+    <div id="note-enreg" class="masque"></div>
+  </div>
+  <div class="chips" id="note-chips"></div>
+  <div class="carte" id="notes-liste"></div>
+</section>
+
+<!-- ============================ HISTORIQUE ============================ -->
+<section class="ecran" id="ecran-historique">
+  <div class="seg dom" id="h-dom"><button data-v="" class="actif">Tous</button><button class="P" data-v="Pharmacie">Pharmacie</button><button class="M" data-v="Maison">Maison</button></div>
+  <input type="search" id="h-recherche" placeholder="Rechercher dans l'historique…" style="margin-top:8px">
+  <div class="chips" style="margin-top:8px" id="h-chips"><button class="chip actif" data-v="taches">Tâches terminées</button><button class="chip" data-v="notes">Notes traitées</button></div>
+  <div id="h-liste"></div>
+  <div class="aide" style="text-align:center;margin-top:8px">12 derniers mois. L'intégralité reste dans le classeur (onglets TACHES, HISTORIQUE et JOURNAL).</div>
+</section>
+
+<!-- ============================ PLUS ============================ -->
+<section class="ecran" id="ecran-plus">
+  <div class="carte">
+    <div class="titre-section" style="margin-top:0">Récurrences</div>
+    <div id="recur-liste"></div>
+    <button class="btn sec petit" id="btn-nouvelle-recur">+ Nouvelle tâche récurrente</button>
+  </div>
+  <div class="carte">
+    <div class="titre-section" style="margin-top:0">Tableau de bord</div>
+    <div id="plus-tdb"></div>
+  </div>
+  <div class="carte">
+    <button class="btn sec petit" id="btn-historique">🕘 Historique (12 mois)</button>
+    <button class="btn sec petit" id="btn-fenetre">Afficher la fenêtre du jour</button>
+    <button class="btn sec petit" id="btn-actualiser">Actualiser les données</button>
+    <button class="btn sec petit" id="btn-classeur">Ouvrir le classeur Google Sheets</button>
+    <button class="btn sec petit" id="btn-changer-utilisateur">Changer d'utilisateur</button>
+    <div class="aide" id="plus-info"></div>
+  </div>
+</section>
+</main>
+
+<nav>
+  <button data-ecran="jour" class="actif"><span class="ico">☀️</span>Jour</button>
+  <button data-ecran="pharma"><span class="ico">💊</span>Pharmacie<span class="badge masque" id="badge-P"></span></button>
+  <button data-ecran="maison"><span class="ico">🏠</span>Maison<span class="badge masque" id="badge-M"></span></button>
+  <button data-ecran="notes"><span class="ico">📝</span>Notes<span class="badge masque" id="badge-N"></span></button>
+  <button data-ecran="plus"><span class="ico">⋯</span>Plus</button>
+</nav>
+<button class="fab" id="fab">+</button>
+
+<!-- ============================ MODALE : NOUVELLE TÂCHE ============================ -->
+<div class="modal" id="m-nouvelle"><div class="feuille"><div class="poignee"></div>
+  <h2>Nouvelle tâche</h2>
+  <div class="seg dom" id="n-dom"><button class="P actif" data-v="Pharmacie">Pharmacie</button><button class="M" data-v="Maison">Maison</button></div>
+  <label>Titre</label><input id="n-titre" placeholder="Que devez-vous faire ?">
+  <label>Catégorie</label><select id="n-cat"></select>
+  <label>Description (facultative)</label><textarea id="n-desc" placeholder="Détails, références, quantités…"></textarea>
+  <label>Urgence</label><div class="seg" id="n-urg"><button data-v="1">1 · Faible</button><button data-v="2" class="actif">2 · Moyenne</button><button data-v="3">3 · Haute</button></div>
+  <label>Importance</label><div class="seg" id="n-imp"><button data-v="1">1 · Faible</button><button data-v="2" class="actif">2 · Moyenne</button><button data-v="3">3 · Haute</button></div>
+  <label>Échéance</label><input type="date" id="n-ech">
+  <div class="chips" style="margin-top:6px"><button class="chip" data-j="0">Aujourd'hui</button><button class="chip" data-j="1">Demain</button><button class="chip" data-j="lundi">Lundi</button><button class="chip" data-j="7">+ 1 semaine</button><button class="chip" data-j="30">+ 1 mois</button><button class="chip" data-j="">Aucune</button></div>
+  <label>Responsable</label><div class="seg" id="n-resp"></div>
+  <label>Tâche récurrente ?</label><div class="seg" id="n-rec"><button data-v="non" class="actif">Non</button><button data-v="oui">Oui</button></div>
+  <div id="n-rec-bloc" class="masque">
+    <label>Fréquence</label><select id="n-freq"></select>
+    <label>Intervalle (toutes les N périodes)</label><input type="number" id="n-inter" value="1" min="1">
+    <label>Créer la tâche X jours avant l'échéance</label><input type="number" id="n-avant" value="1" min="0">
+    <div class="aide">La première échéance est celle saisie ci-dessus (elle fixe le jour de la semaine ou du mois).</div>
+  </div>
+  <button class="btn" id="n-enregistrer">Enregistrer</button>
+  <button class="btn sec" data-fermer>Annuler</button>
+</div></div>
+
+<!-- ============================ MODALE : DÉTAIL TÂCHE ============================ -->
+<div class="modal" id="m-detail"><div class="feuille" id="detail-corps"></div></div>
+
+<!-- ============================ MODALE : FENÊTRE DU JOUR ============================ -->
+<div class="modal" id="m-jour"><div class="feuille" id="jour-corps"></div></div>
+
+<!-- ============================ MODALE : UTILISATEUR ============================ -->
+<div class="modal" id="m-util"><div class="feuille"><div class="poignee"></div><h2>Connexion</h2><div id="util-liste"></div></div></div>
+
+<input type="file" id="f-photo" accept="image/*" capture="environment" class="masque">
+<input type="file" id="f-audio" class="masque">
+<input type="file" id="f-doc" class="masque">
+<div class="chargement" id="chargement">Chargement…</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================================
+//  ÉTAT
+// ============================================================================
+var D = null;                 // données chargées depuis le classeur
+var utilisateur = '';         // prénom de l'utilisateur courant
+var ecranCourant = 'jour';
+var domaineCourant = 'Pharmacie';
+var filtreStatut = { Pharmacie: 'ouvertes', Maison: 'ouvertes' };
+var filtreNotes = { domaine: '', etat: 'non' };
+var filtreHisto = { domaine: '', type: 'taches' };
+var tacheOuverte = null;      // id de la tâche affichée en détail
+var vueCourante = 'moi';      // moi | autre | tous : filtre par responsable
+var cibleFichier = null;      // {domaine, tache, type}
+
+function $(id){ return document.getElementById(id); }
+function ech(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+/* ==== Accès serveur (application hébergée hors Apps Script) ==== */
+var URL_API = 'https://script.google.com/macros/s/AKfycbxzdPB9uu3IZz8G1mOpLomnFvnC0a8szz128yxLx0oRfM4oLqPPkt_Q824NkxCZem9B/exec';
+function appelBrut(fn, args, code){
+  return fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ fonction: fn, args: args || [], code: code }),
+    redirect: 'follow', credentials: 'omit'
+  }).then(function(r){
+    if (!r.ok) throw new Error('Serveur injoignable (' + r.status + ')');
+    return r.json();
+  }).then(function(rep){
+    if (!rep.ok) {
+      var e = new Error(rep.erreur || 'Erreur serveur');
+      if (rep.codeRefuse) { memoEcrire('st_code', ''); ouvrirConnexion(rep.erreur); }
+      throw e;
+    }
+    return rep.resultat;
+  });
+}
+function appel(fn){
+  var args = Array.prototype.slice.call(arguments, 1);
+  var code = memoLire('st_code');
+  if (!code) { ouvrirConnexion(); return Promise.reject(new Error('Code d\u2019accès requis')); }
+  return appelBrut(fn, args, code);
+}
+function charger(o){ $('chargement').classList.toggle('ouvert', !!o); }
+function toast(m){ var t = $('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(t._x); t._x = setTimeout(function(){ t.style.display = 'none'; }, 2600); }
+function memoLire(k){ try { return localStorage.getItem(k) || ''; } catch(e){ return ''; } }
+function memoEcrire(k, v){ try { localStorage.setItem(k, v); } catch(e){} }
+
+// ----- dates (format ISO aaaa-mm-jj, comparaison par chaîne) -----
+function isoDate(d){ return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function plusJours(iso, n){ var p = iso.split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2], 12); d.setDate(d.getDate() + n); return isoDate(d); }
+function prochainLundi(iso){ var p = iso.split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2], 12); var j = d.getDay(); d.setDate(d.getDate() + ((8 - j) % 7 || 7)); return isoDate(d); }
+var JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'], MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+function dateLisible(iso){ if (!iso) return ''; var p = iso.split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2], 12); return JOURS[d.getDay()] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()] + (d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''); }
+function joursTexte(t){
+  if (!t.echeance) return 'sans échéance';
+  var n = t.joursRestants;
+  if (n === null || n === undefined) return dateLisible(t.echeance);
+  if (n < 0) return '<span class="retard">en retard de ' + (-n) + ' j · ' + dateLisible(t.echeance) + '</span>';
+  if (n === 0) return '<b>aujourd\'hui</b>';
+  if (n === 1) return 'demain';
+  return 'dans ' + n + ' j · ' + dateLisible(t.echeance);
+}
+
+// ============================================================================
+//  CHARGEMENT
+// ============================================================================
+function recharger(silencieux){
+  if (!silencieux) charger(true);
+  return appel('chargerDonnees').then(function(d){
+    if (typeof d === 'string') d = JSON.parse(d);
+    if (!d || !d.params) throw new Error('réponse vide du classeur (vérifiez que les onglets TACHES, NOTES, RECURRENCES et PARAMETRES existent)');
+    D = d;
+    if (!utilisateur) choisirUtilisateurAuto();
+    rendreTout();
+    charger(false);
+  }).catch(function(e){ charger(false); toast('Erreur de chargement : ' + (e.message || e)); });
+}
+function choisirUtilisateurAuto(){
+  var memo = memoLire('st_utilisateur');
+  if (memo) { utilisateur = memo; return; }
+  ouvrirConnexion();
+}
+/* Connexion par code personnel : le prénom est fixé par le serveur, pas choisi à l'écran. */
+function ouvrirConnexion(message){
+  $('util-liste').innerHTML =
+    '<p style="margin:4px 0 10px;color:var(--gris)">' + ech(message || 'Saisissez votre code personnel.') + '</p>' +
+    '<input id="code-acces" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="Code" ' +
+    'style="width:100%;font-size:22px;letter-spacing:6px;text-align:center;padding:12px;border:1px solid var(--bord);border-radius:12px">' +
+    '<button class="btn" id="btn-code">Entrer</button>';
+  var champ = $('code-acces'), bouton = $('btn-code');
+  var valider = function(){
+    var code = String(champ.value || '').trim();
+    if (!/^\d{4,8}$/.test(code)) { toast('Code : 4 à 8 chiffres'); return; }
+    bouton.disabled = true; bouton.textContent = 'Vérification…';
+    appelBrut('connexion', [], code).then(function(r){
+      memoEcrire('st_code', code); memoEcrire('st_utilisateur', r.prenom);
+      utilisateur = r.prenom; vueCourante = 'moi'; memoEcrire('st_vue', 'moi');
+      fermer('m-util'); recharger();
+    }).catch(function(e){
+      bouton.disabled = false; bouton.textContent = 'Entrer';
+      champ.value = ''; toast(e.message || String(e));
+    });
+  };
+  bouton.onclick = valider;
+  champ.onkeydown = function(ev){ if (ev.key === 'Enter') valider(); };
+  ouvrir('m-util');
+  setTimeout(function(){ try { champ.focus(); } catch(e){} }, 200);
+}
+function ouvrirUtilisateur(){
+  if (!confirm('Changer d\u2019utilisateur ? Le code devra être saisi à nouveau.')) return;
+  memoEcrire('st_code', ''); memoEcrire('st_utilisateur', ''); utilisateur = '';
+  ouvrirConnexion();
+}
+
+// ============================================================================
+//  RENDU GLOBAL
+// ============================================================================
+function rendreTout(){
+  if (!D) return;
+  $('btn-utilisateur').textContent = utilisateur || '?';
+  $('h-sous').textContent = dateLisible(D.aujourdhui);
+  var memoVue = memoLire('st_vue'); if (memoVue === 'moi' || memoVue === 'autre' || memoVue === 'tous') vueCourante = memoVue;
+  if (vueCourante === 'autre' && !autreUtilisateur()) vueCourante = 'moi';
+  rendreVue(); rendreJour(); rendreDomaine(); rendreNotes(); rendrePlus(); rendreBadges();
+  if (D.params.options.fenetreJour && memoLire('st_fenetre') !== D.aujourdhui) { memoEcrire('st_fenetre', D.aujourdhui); ouvrirFenetreJour(); }
+}
+/** Prénom de l'autre utilisateur (première personne déclarée qui n'est pas moi). */
+function autreUtilisateur(){ var l = D.params.utilisateurs.map(function(u){ return u.prenom; }).filter(function(p){ return p !== utilisateur; }); return l[0] || ''; }
+/** Une tâche est visible selon la vue : Moi = mes tâches et « Les deux » ; Autre = les siennes et « Les deux » ; Tous = tout. */
+function visible(t){
+  if (vueCourante === 'tous') return true;
+  var cible = vueCourante === 'moi' ? utilisateur : autreUtilisateur();
+  return t.responsable === cible || t.responsable === 'Les deux' || !t.responsable;
+}
+function tachesVisibles(){ return D.taches.filter(visible); }
+function ouvertes(){ return tachesVisibles().filter(function(t){ return t.statut !== 'Terminé'; }); }
+function rendreVue(){
+  var autre = autreUtilisateur();
+  $('vue').innerHTML = '<button data-v="moi"' + (vueCourante === 'moi' ? ' class="actif"' : '') + '>' + ech(utilisateur || 'Moi') + '</button>' +
+    (autre ? '<button data-v="autre"' + (vueCourante === 'autre' ? ' class="actif"' : '') + '>' + ech(autre) + '</button>' : '') +
+    '<button data-v="tous"' + (vueCourante === 'tous' ? ' class="actif"' : '') + '>Tous les deux</button>';
+  $('vue').style.display = (ecranCourant === 'jour' || ecranCourant === 'pharma' || ecranCourant === 'maison') ? 'flex' : 'none';
+}
+$('vue').addEventListener('change', function(){ vueCourante = segValeur('vue') || 'moi'; memoEcrire('st_vue', vueCourante); rendreTout(); });
+function classeQuad(t){ var q = String(t.quadrant || '').charAt(0); return q ? 'q' + q : ''; }
+function htmlItem(t){
+  var cls = t.domaine === 'Maison' ? 'M' : 'P';
+  var meta = ech(t.categorie || '') + ' · ' + joursTexte(t);
+  if (t.statut === 'Bloqué') meta += ' · <span class="bloque">bloquée</span>';
+  else if (t.statut === 'En attente') meta += ' · en attente';
+  if (t.responsable && (vueCourante === 'tous' || t.responsable === 'Les deux')) meta += ' · ' + ech(t.responsable);
+  return '<div class="item ' + cls + (t.statut === 'Terminé' ? ' fini' : '') + '" data-id="' + ech(t.id) + '">' +
+    '<div class="barre" style="background:var(--' + (cls === 'M' ? 'maison' : 'pharma') + ')"></div>' +
+    '<div class="corps"><div class="t">' + ech(t.titre) + '</div><div class="m">' + meta + '</div>' +
+    (t.avancement > 0 && t.statut !== 'Terminé' ? '<div class="prog"><i style="width:' + Math.round(t.avancement * 100) + '%"></i></div>' : '') + '</div>' +
+    (t.score !== null && t.statut !== 'Terminé' ? '<div class="score ' + classeQuad(t) + '">' + Math.round(t.score) + '</div>' : '') + '</div>';
+}
+function lierItems(conteneur){
+  conteneur.querySelectorAll('.item[data-id]').forEach(function(el){ el.onclick = function(){ ouvrirDetail(el.dataset.id); }; });
+}
+function triScore(a, b){ return (b.score || 0) - (a.score || 0); }
+
+// ----- écran JOUR -----
+function rendreJour(){
+  var o = ouvertes(), auj = D.aujourdhui, j3 = plusJours(auj, 3);
+  var retard = o.filter(function(t){ return t.retard; }).sort(triScore);
+  var cejour = o.filter(function(t){ return t.echeance === auj; }).sort(triScore);
+  var bientot = o.filter(function(t){ return t.echeance > auj && t.echeance <= j3; }).sort(triScore);
+  var bloquees = o.filter(function(t){ return t.statut === 'Bloqué' && !t.retard && t.echeance !== auj; }).sort(triScore);
+  var q1 = o.filter(function(t){ return String(t.quadrant).charAt(0) === '1' && !t.retard && t.echeance !== auj && !(t.echeance > auj && t.echeance <= j3); }).sort(triScore);
+  var notes = D.notes.filter(function(n){ return !n.traite; });
+  var recap = '';
+  ['Pharmacie', 'Maison'].forEach(function(dom){
+    var l = o.filter(function(t){ return t.domaine === dom; });
+    var r = l.filter(function(t){ return t.retard; }).length, b = l.filter(function(t){ return t.statut === 'Bloqué'; }).length;
+    var s7 = l.filter(function(t){ return t.echeance >= auj && t.echeance <= plusJours(auj, 7); }).length;
+    recap += '<div class="c ' + (dom === 'Maison' ? 'M' : 'P') + '" data-dom="' + dom + '"><span>' + dom + '</span><b>' + l.length + '</b><span>tâches ouvertes</span>' +
+      '<small>' + (r ? '⚠️ ' + r + ' en retard · ' : '') + s7 + ' à 7 jours' + (b ? ' · ' + b + ' bloquée' + (b > 1 ? 's' : '') : '') + '</small></div>';
+  });
+  $('recap').innerHTML = recap;
+  $('recap').querySelectorAll('.c').forEach(function(el){ el.onclick = function(){ allerDomaine(el.dataset.dom); }; });
+  var h = '';
+  function bloc(titre, liste){ if (!liste.length) return; h += '<div class="titre-section">' + titre + ' (' + liste.length + ')</div><div class="carte">' + liste.map(htmlItem).join('') + '</div>'; }
+  bloc('🔴 En retard', retard); bloc('📅 Aujourd\'hui', cejour); bloc('⏳ Dans les 3 jours', bientot); bloc('🚧 Bloquées', bloquees); bloc('⚡ Faire maintenant', q1);
+  if (notes.length) {
+    h += '<div class="titre-section">📝 Notes à retraiter (' + notes.length + ')</div><div class="carte">' + notes.slice(0, 5).map(function(n){
+      return '<div class="item" data-note="1"><div class="barre" style="background:var(--' + (n.domaine === 'Maison' ? 'maison' : 'pharma') + ')"></div><div class="corps"><div class="t" style="font-weight:500">' + ech(String(n.contenu).substring(0, 120)) + '</div><div class="m">' + ech(n.type) + ' · ' + dateLisible(n.date) + ' · ' + ech(n.auteur) + '</div></div></div>';
+    }).join('') + (notes.length > 5 ? '<div class="aide" style="text-align:center">et ' + (notes.length - 5) + ' autre(s) dans l\'onglet Notes</div>' : '') + '</div>';
+  }
+  if (!h) h = '<div class="vide">Rien d\'urgent ni de retard. Belle journée !</div>';
+  $('jour-liste').innerHTML = h;
+  lierItems($('jour-liste'));
+  $('jour-liste').querySelectorAll('[data-note]').forEach(function(el){ el.onclick = function(){ filtreNotes.etat = 'non'; allerEcran('notes'); }; });
+}
+
+// ----- écran DOMAINE -----
+function allerDomaine(dom){ domaineCourant = dom; allerEcran(dom === 'Maison' ? 'maison' : 'pharma'); }
+function rendreDomaine(){
+  var dom = domaineCourant, auj = D.aujourdhui;
+  var toutes = tachesVisibles().filter(function(t){ return t.domaine === dom; });
+  var o = toutes.filter(function(t){ return t.statut !== 'Terminé'; });
+  var moy = o.length ? Math.round(o.reduce(function(s, t){ return s + t.avancement; }, 0) / o.length * 100) : 0;
+  $('dom-stats').innerHTML = '<div><b>' + o.length + '</b><span>ouvertes</span></div><div class="r"><b>' + o.filter(function(t){ return t.retard; }).length + '</b><span>en retard</span></div>' +
+    '<div class="o"><b>' + o.filter(function(t){ return t.echeance >= auj && t.echeance <= plusJours(auj, 7); }).length + '</b><span>à 7 jours</span></div><div><b>' + moy + ' %</b><span>avancement</span></div>';
+  var chips = [['ouvertes', 'Ouvertes'], ['À faire', 'À faire'], ['En cours', 'En cours'], ['Bloqué', 'Bloquées'], ['En attente', 'En attente'], ['Terminé', 'Terminées']];
+  $('dom-chips').innerHTML = chips.map(function(c){ return '<button class="chip' + (filtreStatut[dom] === c[0] ? ' actif' : '') + '" data-v="' + c[0] + '">' + c[1] + '</button>'; }).join('');
+  $('dom-chips').querySelectorAll('.chip').forEach(function(b){ b.onclick = function(){ filtreStatut[dom] = b.dataset.v; rendreDomaine(); }; });
+  var sel = $('dom-categorie'), val = sel.value;
+  sel.innerHTML = '<option value="">Toutes les catégories</option>' + D.params.categories[dom].map(function(c){ return '<option' + (c === val ? ' selected' : '') + '>' + ech(c) + '</option>'; }).join('');
+  var q = $('dom-recherche').value.trim().toLowerCase(), f = filtreStatut[dom], cat = sel.value, tri = $('dom-tri').value;
+  var liste = toutes.filter(function(t){
+    if (f === 'ouvertes') { if (t.statut === 'Terminé') return false; }
+    else if (t.statut !== f) return false;
+    if (cat && t.categorie !== cat) return false;
+    if (q && (t.titre + ' ' + t.description + ' ' + t.categorie + ' ' + t.derniereNote).toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  });
+  if (tri === 'score') liste.sort(triScore);
+  else if (tri === 'echeance') liste.sort(function(a, b){ return (a.echeance || '9999') < (b.echeance || '9999') ? -1 : 1; });
+  else liste.sort(function(a, b){ return (b.majLe || '') < (a.majLe || '') ? -1 : 1; });
+  $('dom-liste').innerHTML = liste.length ? liste.map(htmlItem).join('') : '<div class="vide">Aucune tâche pour ce filtre.</div>';
+  lierItems($('dom-liste'));
+}
+
+// ----- écran NOTES -----
+function rendreNotes(){
+  var chips = [['', 'Tous domaines'], ['Pharmacie', 'Pharmacie'], ['Maison', 'Maison'], ['|non', 'Non traitées'], ['|toutes', 'Toutes']];
+  $('note-chips').innerHTML = chips.map(function(c){
+    var actif = c[0].charAt(0) === '|' ? filtreNotes.etat === c[0].substring(1) : filtreNotes.domaine === c[0];
+    return '<button class="chip' + (actif ? ' actif' : '') + '" data-v="' + c[0] + '">' + c[1] + '</button>';
+  }).join('');
+  $('note-chips').querySelectorAll('.chip').forEach(function(b){ b.onclick = function(){ var v = b.dataset.v; if (v.charAt(0) === '|') filtreNotes.etat = v.substring(1); else filtreNotes.domaine = v; rendreNotes(); }; });
+  var liste = D.notes.filter(function(n){ return (!filtreNotes.domaine || n.domaine === filtreNotes.domaine) && (filtreNotes.etat === 'toutes' || !n.traite); })
+    .sort(function(a, b){ return a.date < b.date ? 1 : a.date > b.date ? -1 : (a.id < b.id ? 1 : -1); });
+  $('notes-liste').innerHTML = liste.length ? liste.map(htmlNote).join('') : '<div class="vide">Aucune note.</div>';
+  lierNotes($('notes-liste'));
+}
+var ICONES = { Texte: '📝', Photo: '📷', Audio: '🎙️', Document: '📎' };
+function htmlNote(n){
+  var t = D.taches.filter(function(t){ return t.id === n.tache; })[0];
+  return '<div class="note' + (n.traite ? ' traitee' : '') + '" data-id="' + ech(n.id) + '"><div class="en-tete"><span class="pastille ' + (n.domaine === 'Maison' ? 'M' : 'P') + '">' + ech(n.domaine) + '</span>' + ICONES[n.type] + ' ' + dateLisible(n.date) + ' · ' + ech(n.auteur) + (t ? ' · <u data-tache="' + ech(t.id) + '">' + ech(t.titre.substring(0, 30)) + '</u>' : '') + '</div>' +
+    '<div class="contenu">' + ech(n.contenu) + '</div><div class="actions">' +
+    (n.lien ? '<a href="' + ech(n.lien) + '" target="_blank" rel="noopener">Ouvrir ▸</a>' : '') +
+    (!n.traite ? '<button data-act="traiter">✓ Traitée</button>' : '<button data-act="rouvrir">Rouvrir</button>') +
+    (!n.tache && n.type === 'Texte' ? '<button data-act="tache">→ Créer une tâche</button>' : '') +
+    '<button data-act="supprimer">Supprimer</button></div></div>';
+}
+function lierNotes(conteneur){
+  conteneur.querySelectorAll('.note').forEach(function(el){
+    var id = el.dataset.id;
+    el.querySelectorAll('button[data-act]').forEach(function(b){
+      b.onclick = function(ev){
+        ev.stopPropagation();
+        var act = b.dataset.act;
+        if (act === 'traiter' || act === 'rouvrir') ecrire('marquerNote', [id, act === 'traiter', utilisateur], act === 'traiter' ? 'Note traitée' : 'Note rouverte');
+        else if (act === 'supprimer') { if (confirm('Supprimer cette note ?')) ecrire('supprimerNote', [id, utilisateur], 'Note supprimée'); }
+        else if (act === 'tache') { var n = D.notes.filter(function(x){ return x.id === id; })[0]; ouvrirNouvelle(n.domaine, n.contenu, id); }
+      };
+    });
+    el.querySelectorAll('u[data-tache]').forEach(function(u){ u.onclick = function(ev){ ev.stopPropagation(); ouvrirDetail(u.dataset.tache); }; });
+  });
+}
+
+// ----- écran PLUS -----
+function rendrePlus(){
+  var h = D.recurrences.length ? D.recurrences.map(function(r){
+    return '<div class="item"><div class="barre" style="background:var(--' + (r.domaine === 'Maison' ? 'maison' : 'pharma') + ');opacity:' + (r.active ? 1 : .3) + '"></div><div class="corps"><div class="t"' + (r.active ? '' : ' style="color:var(--gris)"') + '>' + ech(r.titre) + '</div><div class="m">' + ech(r.frequence) + (r.intervalle > 1 ? ' ×' + r.intervalle : '') + ' · prochaine : ' + dateLisible(r.prochaine) + ' · ' + ech(r.responsable) + '</div>' +
+      '<div class="actions" style="display:flex;gap:6px;margin-top:6px"><button class="chip" data-act="bascule" data-id="' + ech(r.id) + '">' + (r.active ? 'Suspendre' : 'Réactiver') + '</button><button class="chip" data-act="suppr" data-id="' + ech(r.id) + '">Supprimer</button></div></div></div>';
+  }).join('') : '<div class="vide">Aucune récurrence. Créez-en une ci-dessous ou via « + » puis « Tâche récurrente : Oui ».</div>';
+  $('recur-liste').innerHTML = h;
+  $('recur-liste').querySelectorAll('button[data-act]').forEach(function(b){
+    b.onclick = function(){
+      var r = D.recurrences.filter(function(x){ return x.id === b.dataset.id; })[0];
+      if (b.dataset.act === 'bascule') ecrire('activerRecurrence', [r.id, !r.active, utilisateur], r.active ? 'Récurrence suspendue' : 'Récurrence réactivée');
+      else if (confirm('Supprimer la récurrence « ' + r.titre + ' » ? Les tâches déjà créées sont conservées.')) ecrire('supprimerRecurrence', [r.id, utilisateur], 'Récurrence supprimée');
+    };
+  });
+  var auj = D.aujourdhui, t = '';
+  ['Pharmacie', 'Maison'].forEach(function(dom){
+    var l = tachesVisibles().filter(function(x){ return x.domaine === dom; }), o = l.filter(function(x){ return x.statut !== 'Terminé'; });
+    var st = function(s){ return o.filter(function(x){ return x.statut === s; }).length; };
+    var fin30 = l.filter(function(x){ return x.statut === 'Terminé' && x.termineLe >= plusJours(auj, -30); }).length;
+    t += '<div style="margin-bottom:8px"><span class="pastille ' + (dom === 'Maison' ? 'M' : 'P') + '">' + dom + '</span><div class="aide">' + o.length + ' ouvertes · ' + st('À faire') + ' à faire · ' + st('En cours') + ' en cours · ' + st('Bloqué') + ' bloquées · ' + st('En attente') + ' en attente<br>' +
+      o.filter(function(x){ return x.retard; }).length + ' en retard · ' + o.filter(function(x){ return String(x.quadrant).charAt(0) === '1'; }).length + ' « faire maintenant » · ' + fin30 + ' terminées sur 30 jours</div></div>';
+  });
+  $('plus-tdb').innerHTML = '<div class="aide" style="margin-bottom:6px">Vue : ' + (vueCourante === 'tous' ? 'tous les deux' : vueCourante === 'moi' ? ech(utilisateur) : ech(autreUtilisateur())) + '</div>' + t;
+  $('plus-info').textContent = 'Connecté : ' + (utilisateur || '?') + (D.emailConnecte ? ' (' + D.emailConnecte + ')' : '') + ' · Données du ' + dateLisible(D.aujourdhui) + ' · Rappels agenda : ' + (D.params.options.agenda ? 'activés' : 'désactivés (PARAMETRES!L15)');
+}
+function rendreBadges(){
+  var o = ouvertes(), auj = D.aujourdhui;
+  ['P', 'M'].forEach(function(k){
+    var dom = k === 'M' ? 'Maison' : 'Pharmacie';
+    var n = o.filter(function(t){ return t.domaine === dom && (t.retard || t.echeance === auj); }).length;
+    var b = $('badge-' + k); b.textContent = n; b.classList.toggle('masque', !n);
+  });
+  var nn = D.notes.filter(function(n){ return !n.traite; }).length;
+  $('badge-N').textContent = nn; $('badge-N').classList.toggle('masque', !nn);
+}
+
+// ----- écran HISTORIQUE -----
+var MOIS_LONGS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+function moisLisible(iso){ var p = iso.split('-'); return MOIS_LONGS[+p[1] - 1] + ' ' + p[0]; }
+function rendreHistorique(){
+  var q = $('h-recherche').value.trim().toLowerCase(), dom = filtreHisto.domaine, h = '';
+  $('h-chips').querySelectorAll('.chip').forEach(function(b){ b.classList.toggle('actif', b.dataset.v === filtreHisto.type); });
+  if (filtreHisto.type === 'taches') {
+    var l = D.taches.filter(function(t){ return t.statut === 'Terminé' && t.termineLe && (!dom || t.domaine === dom) && (!q || (t.titre + ' ' + t.categorie + ' ' + t.derniereNote).toLowerCase().indexOf(q) >= 0); })
+      .sort(function(a, b){ return a.termineLe < b.termineLe ? 1 : a.termineLe > b.termineLe ? -1 : 0; });
+    var mois = '';
+    l.forEach(function(t){
+      var m2 = t.termineLe.substring(0, 7);
+      if (m2 !== mois) { mois = m2; h += (h ? '</div>' : '') + '<div class="titre-section">' + moisLisible(mois) + ' (' + l.filter(function(x){ return x.termineLe.substring(0, 7) === mois; }).length + ')</div><div class="carte">'; }
+      h += '<div class="item ' + (t.domaine === 'Maison' ? 'M' : 'P') + '" data-id="' + ech(t.id) + '"><div class="barre" style="background:var(--' + (t.domaine === 'Maison' ? 'maison' : 'pharma') + ')"></div><div class="corps"><div class="t">' + ech(t.titre) + '</div><div class="m">✓ terminée le ' + dateLisible(t.termineLe) + ' · ' + ech(t.categorie) + ' · ' + ech(t.responsable) + (t.echeance ? ' · échéance ' + dateLisible(t.echeance) : '') + '</div></div></div>';
+    });
+    if (h) h += '</div>';
+    $('h-liste').innerHTML = h || '<div class="vide">Aucune tâche terminée sur cette période.</div>';
+    lierItems($('h-liste'));
+  } else {
+    var n = D.notes.filter(function(x){ return x.traite && (!dom || x.domaine === dom) && (!q || String(x.contenu).toLowerCase().indexOf(q) >= 0); })
+      .sort(function(a, b){ return (a.traiteLe || a.date) < (b.traiteLe || b.date) ? 1 : -1; });
+    $('h-liste').innerHTML = n.length ? '<div class="carte">' + n.map(htmlNote).join('') + '</div>' : '<div class="vide">Aucune note traitée.</div>';
+    lierNotes($('h-liste'));
+  }
+}
+$('h-dom').addEventListener('change', function(){ filtreHisto.domaine = segValeur('h-dom'); rendreHistorique(); });
+$('h-recherche').oninput = rendreHistorique;
+$('h-chips').querySelectorAll('.chip').forEach(function(b){ b.onclick = function(){ filtreHisto.type = b.dataset.v; rendreHistorique(); }; });
+
+// ============================================================================
+//  FENÊTRE DU JOUR (rappel à l'ouverture)
+// ============================================================================
+function ouvrirFenetreJour(){
+  var o = ouvertes(), auj = D.aujourdhui, j3 = plusJours(auj, 3);
+  var h = '<div class="poignee"></div><h2>' + (new Date().getHours() < 17 ? 'Bonjour' : 'Bonsoir') + (utilisateur ? ' ' + ech(utilisateur) : '') + ' — ' + dateLisible(auj) + '</h2>';
+  var total = 0;
+  ['Pharmacie', 'Maison'].forEach(function(dom){
+    var l = o.filter(function(t){ return t.domaine === dom; });
+    var retard = l.filter(function(t){ return t.retard; }), ce = l.filter(function(t){ return t.echeance === auj; }), bt = l.filter(function(t){ return t.echeance > auj && t.echeance <= j3; }), bl = l.filter(function(t){ return t.statut === 'Bloqué'; });
+    total += retard.length + ce.length;
+    h += '<div class="carte"><span class="pastille ' + (dom === 'Maison' ? 'M' : 'P') + '">' + dom + '</span><div class="aide" style="font-size:14px;color:var(--texte);margin-top:8px">' +
+      (retard.length ? '🔴 <b>' + retard.length + ' en retard</b><br>' : '') + (ce.length ? '📅 <b>' + ce.length + ' aujourd\'hui</b><br>' : '') + (bt.length ? '⏳ ' + bt.length + ' dans les 3 jours<br>' : '') + (bl.length ? '🚧 ' + bl.length + ' bloquée' + (bl.length > 1 ? 's' : '') + '<br>' : '') +
+      (!retard.length && !ce.length && !bt.length && !bl.length ? 'Rien d\'urgent.' : '') + '</div>' +
+      retard.concat(ce).sort(triScore).slice(0, 3).map(function(t){ return '<div class="aide">• ' + ech(t.titre) + '</div>'; }).join('') + '</div>';
+  });
+  var nn = D.notes.filter(function(n){ return !n.traite; }).length;
+  if (nn) h += '<div class="aide">📝 ' + nn + ' note' + (nn > 1 ? 's' : '') + ' à retraiter.</div>';
+  h += '<button class="btn" data-fermer>' + (total ? 'Voir ma journée' : 'Fermer') + '</button>';
+  $('jour-corps').innerHTML = h;
+  $('jour-corps').querySelector('[data-fermer]').onclick = function(){ fermer('m-jour'); allerEcran('jour'); };
+  ouvrir('m-jour');
+}
+
+// ============================================================================
+//  NAVIGATION ET MODALES
+// ============================================================================
+function allerEcran(e){
+  ecranCourant = e;
+  document.querySelectorAll('nav button').forEach(function(b){ b.classList.toggle('actif', b.dataset.ecran === e); });
+  var id = e === 'pharma' || e === 'maison' ? 'ecran-domaine' : 'ecran-' + e;
+  if (e === 'pharma') domaineCourant = 'Pharmacie'; if (e === 'maison') domaineCourant = 'Maison';
+  document.querySelectorAll('.ecran').forEach(function(s){ s.classList.toggle('actif', s.id === id); });
+  $('h-titre').textContent = e === 'jour' ? 'Ma journée' : e === 'pharma' ? 'Pharmacie' : e === 'maison' ? 'Maison' : e === 'notes' ? 'Notes & mémos' : e === 'historique' ? 'Historique' : 'Plus';
+  document.querySelectorAll('nav button').forEach(function(b){ if (e === 'historique' && b.dataset.ecran === 'plus') b.classList.add('actif'); });
+  if (D) { rendreVue(); if (id === 'ecran-domaine') rendreDomaine(); if (e === 'notes') rendreNotes(); if (e === 'historique') rendreHistorique(); }
+  window.scrollTo(0, 0);
+}
+function ouvrir(id){ $(id).classList.add('ouvert'); }
+function fermer(id){ $(id).classList.remove('ouvert'); if (id === 'm-detail') tacheOuverte = null; }
+document.querySelectorAll('.modal').forEach(function(m){ m.addEventListener('click', function(ev){ if (ev.target === m && m.id !== 'm-util') fermer(m.id); }); });
+document.querySelectorAll('[data-fermer]').forEach(function(b){ b.onclick = function(){ fermer(b.closest('.modal').id); }; });
+document.querySelectorAll('nav button').forEach(function(b){ b.onclick = function(){ allerEcran(b.dataset.ecran); }; });
+function segment(id, valeur){ $(id).querySelectorAll('button').forEach(function(b){ b.classList.toggle('actif', String(b.dataset.v) === String(valeur)); }); }
+function segValeur(id){ var b = $(id).querySelector('button.actif'); return b ? b.dataset.v : ''; }
+document.querySelectorAll('.seg').forEach(function(s){ s.addEventListener('click', function(ev){ var b = ev.target.closest('button'); if (!b || !s.contains(b)) return; segment(s.id, b.dataset.v); s.dispatchEvent(new CustomEvent('change')); }); });
+
+/** Exécute une écriture, recharge et affiche un message. */
+function ecrire(fn, args, message){
+  charger(true);
+  return appel.apply(null, [fn].concat(args)).then(function(res){ toast(message || 'Enregistré'); return recharger(true).then(function(){ return res; }); })
+    .catch(function(e){ charger(false); toast('Erreur : ' + (e.message || e)); throw e; });
+}
+
+// ============================================================================
+//  NOUVELLE TÂCHE
+// ============================================================================
+var noteSource = null;
+function ouvrirNouvelle(domaine, titre, noteId){
+  noteSource = noteId || null;
+  segment('n-dom', domaine || (ecranCourant === 'maison' ? 'Maison' : 'Pharmacie'));
+  $('n-titre').value = titre ? String(titre).substring(0, 120) : ''; $('n-desc').value = titre && titre.length > 120 ? titre : '';
+  segment('n-urg', 2); segment('n-imp', 2); $('n-ech').value = ''; segment('n-rec', 'non'); $('n-rec-bloc').classList.add('masque');
+  $('n-inter').value = 1; $('n-avant').value = 1;
+  $('n-resp').innerHTML = D.params.responsables.map(function(r){ return '<button data-v="' + ech(r) + '">' + ech(r) + '</button>'; }).join('');
+  segment('n-resp', D.params.responsables.indexOf(utilisateur) >= 0 ? utilisateur : D.params.responsables[0]);
+  $('n-freq').innerHTML = D.params.frequences.map(function(f){ return '<option>' + ech(f) + '</option>'; }).join(''); $('n-freq').value = 'Hebdomadaire';
+  remplirCategories();
+  ouvrir('m-nouvelle');
+  setTimeout(function(){ $('n-titre').focus(); }, 250);
+}
+function remplirCategories(){ var dom = segValeur('n-dom'); $('n-cat').innerHTML = D.params.categories[dom].map(function(c){ return '<option>' + ech(c) + '</option>'; }).join(''); }
+$('n-dom').addEventListener('change', remplirCategories);
+$('n-rec').addEventListener('change', function(){ $('n-rec-bloc').classList.toggle('masque', segValeur('n-rec') !== 'oui'); });
+$('m-nouvelle').querySelectorAll('.chip[data-j]').forEach(function(c){ c.onclick = function(){ var j = c.dataset.j; $('n-ech').value = j === '' ? '' : j === 'lundi' ? prochainLundi(D.aujourdhui) : plusJours(D.aujourdhui, +j); }; });
+$('fab').onclick = function(){ ouvrirNouvelle(); };
+$('n-enregistrer').onclick = function(){
+  var titre = $('n-titre').value.trim();
+  if (!titre) { toast('Le titre est obligatoire'); return; }
+  var base = { domaine: segValeur('n-dom'), categorie: $('n-cat').value, titre: titre, description: $('n-desc').value.trim(), urgence: +segValeur('n-urg'), importance: +segValeur('n-imp'), responsable: segValeur('n-resp') };
+  if (segValeur('n-rec') === 'oui') {
+    if (!$('n-ech').value) { toast('Indiquez la première échéance'); return; }
+    var rc = Object.assign({}, base, { frequence: $('n-freq').value, intervalle: +$('n-inter').value || 1, prochaine: $('n-ech').value, avant: +$('n-avant').value || 0 });
+    fermer('m-nouvelle'); ecrire('creerRecurrence', [rc, utilisateur], 'Récurrence créée');
+  } else {
+    base.echeance = $('n-ech').value || '';
+    fermer('m-nouvelle');
+    if (noteSource) ecrire('convertirNoteEnTache', [noteSource, base, utilisateur], 'Tâche créée depuis la note');
+    else ecrire('creerTache', [base, utilisateur], 'Tâche créée');
+  }
+};
+
+// ============================================================================
+//  DÉTAIL D'UNE TÂCHE
+// ============================================================================
+function ouvrirDetail(id){ tacheOuverte = id; rendreDetail(); ouvrir('m-detail'); }
+function rendreDetail(){
+  if (!tacheOuverte) return;
+  var t = D.taches.filter(function(x){ return x.id === tacheOuverte; })[0];
+  if (!t) { fermer('m-detail'); return; }
+  var cls = t.domaine === 'Maison' ? 'M' : 'P';
+  var sous = D.sousTaches.filter(function(s){ return s.tache === t.id; }).sort(function(a, b){ return a.ordre - b.ordre; });
+  var notes = D.notes.filter(function(n){ return n.tache === t.id; }).sort(function(a, b){ return a.date < b.date ? 1 : -1; });
+  var h = '<div class="poignee"></div>' +
+    '<div class="entete-detail"><span class="pastille ' + cls + '">' + ech(t.domaine) + '</span><span>' + ech(t.categorie) + '</span><span>' + ech(t.id) + '</span>' + (t.score !== null ? '<span class="pastille ' + classeQuad(t) + '" style="background:var(--gris)">score ' + Math.round(t.score) + '</span>' : '') + '</div>' +
+    '<h2 id="d-titre" contenteditable="true" style="outline:none;border-bottom:1px dashed var(--bord)">' + ech(t.titre) + '</h2>' +
+    '<div class="aide" style="margin-top:-4px">' + (t.quadrant ? ech(t.quadrant) + ' · ' : '') + joursTexte(t) + ' · créée ' + dateLisible(t.creeLe) + (t.creePar ? ' par ' + ech(t.creePar) : '') + (t.recurrence ? ' · récurrence ' + ech(t.recurrence) : '') + '</div>' +
+    '<label>Statut</label><div class="seg" id="d-statut">' + D.params.statuts.map(function(s){ return '<button data-v="' + ech(s) + '"' + (s === t.statut ? ' class="actif"' : '') + '>' + ech(s) + '</button>'; }).join('') + '</div>' +
+    '<label>Avancement' + (sous.length ? ' (calculé d\'après les sous-tâches)' : '') + '</label><div class="range"><input type="range" min="0" max="100" step="5" id="d-avance" value="' + Math.round(t.avancement * 100) + '"' + (sous.length ? ' disabled' : '') + '><b id="d-avance-v">' + Math.round(t.avancement * 100) + ' %</b></div>' +
+    '<label>Sous-tâches / étapes</label><div id="d-sous">' + sous.map(function(s){ return '<div class="sous"><input type="checkbox" data-id="' + ech(s.id) + '"' + (s.fait ? ' checked' : '') + '><span class="' + (s.fait ? 'fait' : '') + '">' + ech(s.libelle) + '</span><button data-suppr="' + ech(s.id) + '">×</button></div>'; }).join('') + '</div>' +
+    '<div style="display:flex;gap:6px;margin-top:6px"><input id="d-sous-nouv" placeholder="Ajouter une étape…"><button class="btn petit" style="width:auto;margin:0;padding:0 14px" id="d-sous-add">+</button></div>' +
+    '<label>Échéance</label><div style="display:flex;gap:6px"><input type="date" id="d-ech" value="' + ech(t.echeance) + '"><button class="chip" id="d-ech-ok" style="flex-shrink:0">OK</button></div>' +
+    '<label>Urgence</label><div class="seg" id="d-urg"><button data-v="1"' + (t.urgence === 1 ? ' class="actif"' : '') + '>1 · Faible</button><button data-v="2"' + (t.urgence === 2 ? ' class="actif"' : '') + '>2 · Moyenne</button><button data-v="3"' + (t.urgence === 3 ? ' class="actif"' : '') + '>3 · Haute</button></div>' +
+    '<label>Importance</label><div class="seg" id="d-imp"><button data-v="1"' + (t.importance === 1 ? ' class="actif"' : '') + '>1 · Faible</button><button data-v="2"' + (t.importance === 2 ? ' class="actif"' : '') + '>2 · Moyenne</button><button data-v="3"' + (t.importance === 3 ? ' class="actif"' : '') + '>3 · Haute</button></div>' +
+    '<label>Responsable</label><div class="seg" id="d-resp">' + D.params.responsables.map(function(r){ return '<button data-v="' + ech(r) + '"' + (r === t.responsable ? ' class="actif"' : '') + '>' + ech(r) + '</button>'; }).join('') + '</div>' +
+    '<label>Description</label><textarea id="d-desc">' + ech(t.description) + '</textarea><button class="chip" id="d-desc-ok" style="margin-top:6px">Enregistrer la description</button>' +
+    '<label>Note sur cette tâche (texte ou dictée)</label><textarea id="d-note" placeholder="Avancement, appel passé, chose à ne pas oublier…" style="min-height:60px"></textarea><button class="chip" id="d-note-ok" style="margin-top:6px">Ajouter la note</button>' +
+    '<div class="icone-btn"><button id="d-photo"><b>📷</b>Photo</button><button id="d-audio"><b>🎙️</b>Mémo audio</button><button id="d-doc"><b>📎</b>Document</button></div><div id="d-enreg" class="masque"></div>' +
+    (t.piecesJointes.length ? '<label>Pièces jointes (' + t.piecesJointes.length + ')</label><div class="pj">' + t.piecesJointes.map(function(u, i){ return '<a href="' + ech(u) + '" target="_blank" rel="noopener">📎 Pièce ' + (i + 1) + ' ▸</a>'; }).join('') + '</div>' : '') +
+    (notes.length ? '<label>Notes liées (' + notes.length + ')</label><div id="d-notes">' + notes.map(htmlNote).join('') + '</div>' : '') +
+    (t.statut !== 'Terminé' ? '<button class="btn" id="d-terminer">✓ Terminer la tâche</button>' : '<button class="btn sec" id="d-rouvrir">Rouvrir la tâche</button>') +
+    '<div class="ligne-btn"><button class="btn sec" data-fermer>Fermer</button><button class="btn danger" id="d-supprimer">Supprimer</button></div>';
+  var c = $('detail-corps'); c.innerHTML = h;
+  c.querySelector('[data-fermer]').onclick = function(){ fermer('m-detail'); };
+  ['d-statut', 'd-urg', 'd-imp', 'd-resp'].forEach(function(id){
+    var s = $(id);
+    s.addEventListener('click', function(ev){ var b = ev.target.closest('button'); if (!b) return; segment(id, b.dataset.v);
+      var champ = id === 'd-statut' ? 'statut' : id === 'd-urg' ? 'urgence' : id === 'd-imp' ? 'importance' : 'responsable';
+      var ch = {}; ch[champ] = id === 'd-urg' || id === 'd-imp' ? +b.dataset.v : b.dataset.v;
+      ecrire('modifierTache', [t.id, ch, utilisateur], 'Mis à jour').then(rendreDetail);
+    });
+  });
+  $('d-avance').oninput = function(){ $('d-avance-v').textContent = this.value + ' %'; };
+  $('d-avance').onchange = function(){ ecrire('modifierTache', [t.id, { avancement: +this.value / 100 }, utilisateur], 'Avancement enregistré').then(rendreDetail); };
+  $('d-titre').addEventListener('blur', function(){ var v = this.textContent.trim(); if (v && v !== t.titre) ecrire('modifierTache', [t.id, { titre: v }, utilisateur], 'Titre modifié').then(rendreDetail); });
+  $('d-ech-ok').onclick = function(){ ecrire('modifierTache', [t.id, { echeance: $('d-ech').value || '' }, utilisateur], 'Échéance enregistrée').then(rendreDetail); };
+  $('d-desc-ok').onclick = function(){ ecrire('modifierTache', [t.id, { description: $('d-desc').value.trim() }, utilisateur], 'Description enregistrée').then(rendreDetail); };
+  $('d-note-ok').onclick = function(){ var v = $('d-note').value.trim(); if (!v) return; ecrire('ajouterNote', [{ domaine: t.domaine, tache: t.id, type: 'Texte', contenu: v }, utilisateur], 'Note ajoutée').then(rendreDetail); };
+  $('d-sous-add').onclick = function(){ var v = $('d-sous-nouv').value.trim(); if (!v) return; ecrire('ajouterSousTache', [t.id, v, utilisateur], 'Étape ajoutée').then(rendreDetail); };
+  $('d-sous-nouv').onkeydown = function(ev){ if (ev.key === 'Enter') { ev.preventDefault(); $('d-sous-add').click(); } };
+  c.querySelectorAll('#d-sous input[type=checkbox]').forEach(function(cb){ cb.onchange = function(){ ecrire('basculerSousTache', [cb.dataset.id, cb.checked, utilisateur], cb.checked ? 'Étape faite' : 'Étape rouverte').then(rendreDetail); }; });
+  c.querySelectorAll('#d-sous button[data-suppr]').forEach(function(b){ b.onclick = function(){ if (confirm('Supprimer cette étape ?')) ecrire('supprimerSousTache', [b.dataset.suppr, utilisateur], 'Étape supprimée').then(rendreDetail); }; });
+  $('d-photo').onclick = function(){ cibleFichier = { domaine: t.domaine, tache: t.id }; $('f-photo').click(); };
+  $('d-doc').onclick = function(){ cibleFichier = { domaine: t.domaine, tache: t.id }; $('f-doc').click(); };
+  $('d-audio').onclick = function(){ cibleFichier = { domaine: t.domaine, tache: t.id }; demarrerAudio($('d-enreg'), $('d-note')); };
+  if ($('d-terminer')) $('d-terminer').onclick = function(){ ecrire('modifierTache', [t.id, { statut: 'Terminé' }, utilisateur], 'Tâche terminée ✓').then(function(){ fermer('m-detail'); }); };
+  if ($('d-rouvrir')) $('d-rouvrir').onclick = function(){ ecrire('modifierTache', [t.id, { statut: 'En cours' }, utilisateur], 'Tâche rouverte').then(rendreDetail); };
+  $('d-supprimer').onclick = function(){ if (confirm('Supprimer définitivement « ' + t.titre + ' » ?')) ecrire('supprimerTache', [t.id, utilisateur], 'Tâche supprimée').then(function(){ fermer('m-detail'); }); };
+  if ($('d-notes')) lierNotes($('d-notes'));
+}
+
+// ============================================================================
+//  NOTES : saisie, photo, audio, document
+// ============================================================================
+$('note-enregistrer').onclick = function(){
+  var v = $('note-texte').value.trim(); if (!v) { toast('La note est vide'); return; }
+  ecrire('ajouterNote', [{ domaine: segValeur('note-dom'), type: 'Texte', contenu: v }, utilisateur], 'Note enregistrée').then(function(){ $('note-texte').value = ''; });
+};
+$('note-photo').onclick = function(){ cibleFichier = { domaine: segValeur('note-dom'), tache: '' }; $('f-photo').click(); };
+$('note-doc').onclick = function(){ cibleFichier = { domaine: segValeur('note-dom'), tache: '' }; $('f-doc').click(); };
+$('note-audio').onclick = function(){ cibleFichier = { domaine: segValeur('note-dom'), tache: '' }; demarrerAudio($('note-enreg'), $('note-texte')); };
+
+$('f-photo').onchange = function(){ if (this.files[0]) envoyerImage(this.files[0]); this.value = ''; };
+$('f-doc').onchange = function(){ if (this.files[0]) envoyerFichier(this.files[0], 'Document'); this.value = ''; };
+$('f-audio').onchange = function(){ if (this.files[0]) envoyerFichier(this.files[0], ''); this.value = ''; };
+
+/** Réduit la photo (max 1600 px, JPEG) avant envoi pour rester léger et rapide. */
+function envoyerImage(fichier){
+  charger(true);
+  var img = new Image(), url = URL.createObjectURL(fichier);
+  img.onload = function(){
+    var max = 1600, w = img.width, h = img.height, k = Math.min(1, max / Math.max(w, h));
+    var cv = document.createElement('canvas'); cv.width = Math.round(w * k); cv.height = Math.round(h * k);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    var b64 = cv.toDataURL('image/jpeg', 0.82).split(',')[1];
+    URL.revokeObjectURL(url);
+    televerser(b64, 'image/jpeg', 'photo.jpg', 'Photo');
+  };
+  img.onerror = function(){ URL.revokeObjectURL(url); envoyerFichier(fichier, 'Photo'); };
+  img.src = url;
+}
+function envoyerFichier(fichier, type){
+  if (!type) type = (fichier.type || '').indexOf('audio/') === 0 ? 'Audio' : (fichier.type || '').indexOf('image/') === 0 ? 'Photo' : 'Document';
+  if (fichier.size > 25 * 1024 * 1024) { toast('Fichier trop volumineux (25 Mo max)'); return; }
+  charger(true);
+  var lecteur = new FileReader();
+  lecteur.onload = function(){ televerser(String(lecteur.result).split(',')[1], fichier.type || 'application/octet-stream', fichier.name, type); };
+  lecteur.onerror = function(){ charger(false); toast('Lecture du fichier impossible'); };
+  lecteur.readAsDataURL(fichier);
+}
+function televerser(b64, mime, nom, type){
+  var commentaire = prompt(type === 'Audio' ? 'Titre du mémo (facultatif) :' : 'Commentaire (facultatif) :', '') || '';
+  var meta = { domaine: cibleFichier.domaine, tache: cibleFichier.tache, type: type, commentaire: commentaire };
+  appel('televerserFichier', b64, mime, nom, meta, utilisateur).then(function(res){
+    toast(type + ' enregistré(e) dans Drive');
+    return recharger(true).then(function(){ if (tacheOuverte) rendreDetail(); });
+  }).catch(function(e){ charger(false); toast('Envoi impossible : ' + (e.message || e)); });
+}
+
+/**
+ * Mémo vocal. Le micro n'est pas accessible dans le cadre où Google affiche une application
+ * Apps Script : on propose donc la dictée (texte, recherchable) et la jointure d'un enregistrement
+ * Dictaphone passé par l'application Fichiers.
+ */
+function demarrerAudio(zone, champTexte){
+  if (!zone.classList.contains('masque')) { zone.classList.add('masque'); zone.innerHTML = ''; return; }
+  zone.classList.remove('masque');
+  zone.innerHTML = '<div class="carte" style="margin:8px 0 0;background:#FFF8E1">' +
+    '<b>Mémo vocal — deux façons</b>' +
+    '<div class="aide" style="margin-top:6px"><b>1. Dicter (recommandé)</b> : appuyez dans la zone de texte, puis sur le micro du clavier iPhone. Le mémo devient une note écrite, lisible et recherchable.</div>' +
+    '<button class="btn sec petit" id="memo-dicter">Dicter maintenant</button>' +
+    '<div class="aide" style="margin-top:10px"><b>2. Joindre un enregistrement Dictaphone</b> : dans Dictaphone, ouvrez l\'enregistrement, bouton ⋯ > Partager > Enregistrer dans Fichiers. Puis ici : Joindre > Choisir un fichier.</div>' +
+    '<button class="btn sec petit" id="memo-joindre">Joindre un enregistrement</button></div>';
+  zone.querySelector('#memo-dicter').onclick = function(){ zone.classList.add('masque'); zone.innerHTML = ''; if (champTexte) { champTexte.focus(); champTexte.scrollIntoView({ block: 'center' }); } };
+  zone.querySelector('#memo-joindre').onclick = function(){ $('f-audio').click(); };
+}
+
+// ============================================================================
+//  ÉCRAN PLUS : actions
+// ============================================================================
+$('btn-nouvelle-recur').onclick = function(){ ouvrirNouvelle(); segment('n-rec', 'oui'); $('n-rec-bloc').classList.remove('masque'); };
+$('btn-historique').onclick = function(){ allerEcran('historique'); };
+$('btn-fenetre').onclick = ouvrirFenetreJour;
+$('btn-actualiser').onclick = function(){ recharger(); };
+$('btn-classeur').onclick = function(){ window.open(D.urlClasseur, '_blank'); };
+$('btn-changer-utilisateur').onclick = ouvrirUtilisateur;
+$('btn-utilisateur').onclick = ouvrirUtilisateur;
+$('dom-recherche').oninput = rendreDomaine; $('dom-categorie').onchange = rendreDomaine; $('dom-tri').onchange = rendreDomaine;
+
+// Retour au premier plan : données rafraîchies si elles datent de plus de 3 minutes
+var dernierChargement = Date.now();
+document.addEventListener('visibilitychange', function(){ if (!document.hidden && Date.now() - dernierChargement > 180000) { dernierChargement = Date.now(); recharger(true); } });
+
+if (memoLire('st_code') && memoLire('st_utilisateur')) { utilisateur = memoLire('st_utilisateur'); recharger(); } else { ouvrirConnexion(); }
+if ('serviceWorker' in navigator) { window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); }
+</script>
+</body>
+</html>
