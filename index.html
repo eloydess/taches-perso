@@ -83,7 +83,12 @@ label{display:block;font-size:12px;color:var(--gris);margin:10px 0 4px;font-weig
 .note.traitee .contenu{color:var(--gris)}
 .note .actions{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
 .note .actions button{border:1px solid var(--bord);background:#fff;border-radius:8px;padding:5px 9px;font-size:12px}
+.note .actions a.pj-ico{display:inline-flex;align-items:center;gap:5px;border:0;border-radius:18px;padding:5px 12px 5px 8px;font-size:13px;font-weight:700;color:#fff;text-decoration:none}
+.pj-ico .rond{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.25);font-size:14px}
+
+.pj a.pj-ico{display:inline-flex;align-items:center;gap:6px;margin:0 6px 6px 0;border-radius:18px;padding:6px 12px 6px 8px;color:#fff;font-weight:700;text-decoration:none}
 .note .actions a{border:1px solid var(--bord);background:#fff;border-radius:8px;padding:5px 9px;font-size:12px;text-decoration:none;color:var(--maison)}
+.note .actions a.pj-Photo,.pj a.pj-Photo{background:#2E7D32;color:#fff}.note .actions a.pj-Audio,.pj a.pj-Audio{background:#1F4E79;color:#fff}.note .actions a.pj-Document,.pj a.pj-Document{background:#6D4C41;color:#fff}.note .actions a.pj-Autre,.pj a.pj-Autre{background:#757575;color:#fff}
 .vide{color:var(--gris);text-align:center;padding:24px 8px;font-size:14px}
 .chargement{position:fixed;inset:0;background:rgba(255,255,255,.7);z-index:50;display:none;align-items:center;justify-content:center;font-weight:700;color:var(--gris)}
 .chargement.ouvert{display:flex}
@@ -374,6 +379,10 @@ function htmlItem(t){
   if (t.statut === 'Bloqué') meta += ' · <span class="bloque">bloquée</span>';
   else if (t.statut === 'En attente') meta += ' · en attente';
   if (t.responsable && (vueCourante === 'tous' || t.responsable === 'Les deux')) meta += ' · ' + ech(t.responsable);
+  // Pastilles des pièces jointes : on voit d'un coup d'œil qu'une photo, un audio ou un document est attaché
+  var types = {}; (t.piecesJointes || []).forEach(function(u){ var nt = D.notes.filter(function(x){ return x.lien === u; })[0]; types[nt && PIECES[nt.type] ? nt.type : 'Autre'] = true; });
+  var couleurs = { Photo: '#2E7D32', Audio: '#1F4E79', Document: '#6D4C41', Autre: '#757575' };
+  Object.keys(types).forEach(function(k){ meta += ' <span style="display:inline-block;background:' + couleurs[k] + ';color:#fff;border-radius:10px;padding:0 6px;font-size:11px">' + (PIECES[k] ? PIECES[k][0] : '📎') + '</span>'; });
   return '<div class="item ' + cls + (t.statut === 'Terminé' ? ' fini' : '') + '" data-id="' + ech(t.id) + '">' +
     '<div class="barre" style="background:var(--' + (cls === 'M' ? 'maison' : 'pharma') + ')"></div>' +
     '<div class="corps"><div class="t">' + ech(t.titre) + '</div><div class="m">' + meta + '</div>' +
@@ -461,11 +470,17 @@ function rendreNotes(){
   lierNotes($('notes-liste'));
 }
 var ICONES = { Texte: '📝', Photo: '📷', Audio: '🎙️', Document: '📎' };
+/* Bouton coloré avec symbole pour ouvrir une pièce jointe (vert = photo, bleu = audio, brun = document). */
+var PIECES = { Photo: ['📷', 'Photo'], Audio: ['▶️', 'Écouter'], Document: ['📄', 'Document'] };
+function boutonPiece(lien, type){
+  var p = PIECES[type] || ['📎', 'Pièce'];
+  return '<a class="pj-ico pj-' + (PIECES[type] ? type : 'Autre') + '" href="' + ech(lien) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" aria-label="Ouvrir : ' + p[1] + '"><span class="rond">' + p[0] + '</span>' + p[1] + '</a>';
+}
 function htmlNote(n){
   var t = D.taches.filter(function(t){ return t.id === n.tache; })[0];
   return '<div class="note' + (n.traite ? ' traitee' : '') + '" data-id="' + ech(n.id) + '"><div class="en-tete"><span class="pastille ' + (n.domaine === 'Maison' ? 'M' : 'P') + '">' + ech(n.domaine) + '</span>' + ICONES[n.type] + ' ' + dateLisible(n.date) + ' · ' + ech(n.auteur) + (t ? ' · <u data-tache="' + ech(t.id) + '">' + ech(t.titre.substring(0, 30)) + '</u>' : '') + '</div>' +
     '<div class="contenu">' + ech(n.contenu) + '</div><div class="actions">' +
-    (n.lien ? '<a href="' + ech(n.lien) + '" target="_blank" rel="noopener">Ouvrir ▸</a>' : '') +
+    (n.lien ? boutonPiece(n.lien, n.type) : '') +
     (!n.traite ? '<button data-act="traiter">✓ Traitée</button>' : '<button data-act="rouvrir">Rouvrir</button>') +
     '<button data-act="modifier">✏️ Modifier</button>' +
     (!n.tache ? '<button data-act="tache">→ Créer une tâche</button>' : '') +
@@ -699,7 +714,7 @@ function rendreDetail(){
     '<label>Description</label><textarea id="d-desc">' + ech(t.description) + '</textarea><button class="chip" id="d-desc-ok" style="margin-top:6px">Enregistrer la description</button>' +
     '<label>Note sur cette tâche (texte ou dictée)</label><textarea id="d-note" placeholder="Avancement, appel passé, chose à ne pas oublier…" style="min-height:60px"></textarea><button class="chip" id="d-note-ok" style="margin-top:6px">Ajouter la note</button>' +
     '<div class="icone-btn"><button id="d-photo"><b>📷</b>Photo</button><button id="d-audio"><b>🎙️</b>Mémo audio</button><button id="d-doc"><b>📎</b>Document</button></div><div id="d-enreg" class="masque"></div>' +
-    (t.piecesJointes.length ? '<label>Pièces jointes (' + t.piecesJointes.length + ')</label><div class="pj">' + t.piecesJointes.map(function(u, i){ return '<a href="' + ech(u) + '" target="_blank" rel="noopener">📎 Pièce ' + (i + 1) + ' ▸</a>'; }).join('') + '</div>' : '') +
+    (t.piecesJointes.length ? '<label>Pièces jointes (' + t.piecesJointes.length + ')</label><div class="pj">' + t.piecesJointes.map(function(u){ var n = D.notes.filter(function(x){ return x.lien === u; })[0]; return boutonPiece(u, n ? n.type : ''); }).join('') + '</div>' : '') +
     (notes.length ? '<label>Notes liées (' + notes.length + ')</label><div id="d-notes">' + notes.map(htmlNote).join('') + '</div>' : '') +
     (t.statut !== 'Terminé' ? '<button class="btn" id="d-terminer">✓ Terminer la tâche</button>' : '<button class="btn sec" id="d-rouvrir">Rouvrir la tâche</button>') +
     '<div class="ligne-btn"><button class="btn sec" data-fermer>Fermer</button><button class="btn danger" id="d-supprimer">Supprimer</button></div>';
