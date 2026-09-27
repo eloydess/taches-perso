@@ -467,8 +467,30 @@ function htmlNote(n){
     '<div class="contenu">' + ech(n.contenu) + '</div><div class="actions">' +
     (n.lien ? '<a href="' + ech(n.lien) + '" target="_blank" rel="noopener">Ouvrir ▸</a>' : '') +
     (!n.traite ? '<button data-act="traiter">✓ Traitée</button>' : '<button data-act="rouvrir">Rouvrir</button>') +
-    (!n.tache && n.type === 'Texte' ? '<button data-act="tache">→ Créer une tâche</button>' : '') +
+    '<button data-act="modifier">✏️ Modifier</button>' +
+    (!n.tache ? '<button data-act="tache">→ Créer une tâche</button>' : '') +
     '<button data-act="supprimer">Supprimer</button></div></div>';
+}
+/* Modification d'une note (contenu et domaine) directement depuis le téléphone. */
+function editerNote(el, id){
+  var n = D.notes.filter(function(x){ return x.id === id; })[0]; if (!n) return;
+  var zone = el.querySelector('.contenu'); var actions = el.querySelector('.actions');
+  actions.style.display = 'none';
+  zone.innerHTML = '<textarea class="edit-note" style="width:100%;min-height:80px;font-size:15px;padding:8px;border:1px solid var(--bord);border-radius:8px">' + ech(n.contenu) + '</textarea>' +
+    '<div class="seg edit-dom" style="margin-top:6px"><button data-v="Pharmacie"' + (n.domaine !== 'Maison' ? ' class="actif"' : '') + '>Pharmacie</button><button data-v="Maison"' + (n.domaine === 'Maison' ? ' class="actif"' : '') + '>Maison</button></div>' +
+    '<div class="ligne-btn"><button class="btn petit sec edit-annuler">Annuler</button><button class="btn petit edit-ok">Enregistrer</button></div>';
+  var seg = zone.querySelector('.edit-dom');
+  seg.onclick = function(ev){ ev.stopPropagation(); var b = ev.target.closest('button'); if (!b) return; seg.querySelectorAll('button').forEach(function(x){ x.classList.toggle('actif', x === b); }); };
+  zone.querySelector('textarea').onclick = function(ev){ ev.stopPropagation(); };
+  zone.querySelector('.edit-annuler').onclick = function(ev){ ev.stopPropagation(); rendreTout(); if (tacheOuverte) rendreDetail(); };
+  zone.querySelector('.edit-ok').onclick = function(ev){
+    ev.stopPropagation();
+    var contenu = zone.querySelector('textarea').value.trim();
+    var dom = seg.querySelector('button.actif').dataset.v;
+    if (!contenu && n.type === 'Texte') { toast('La note est vide'); return; }
+    ecrire('modifierNote', [id, { contenu: contenu, domaine: dom }, utilisateur], 'Note modifiée').then(function(){ if (tacheOuverte) rendreDetail(); });
+  };
+  setTimeout(function(){ try { zone.querySelector('textarea').focus(); } catch(e){} }, 100);
 }
 function lierNotes(conteneur){
   conteneur.querySelectorAll('.note').forEach(function(el){
@@ -479,7 +501,12 @@ function lierNotes(conteneur){
         var act = b.dataset.act;
         if (act === 'traiter' || act === 'rouvrir') ecrire('marquerNote', [id, act === 'traiter', utilisateur], act === 'traiter' ? 'Note traitée' : 'Note rouverte');
         else if (act === 'supprimer') { if (confirm('Supprimer cette note ?')) ecrire('supprimerNote', [id, utilisateur], 'Note supprimée'); }
-        else if (act === 'tache') { var n = D.notes.filter(function(x){ return x.id === id; })[0]; ouvrirNouvelle(n.domaine, n.contenu, id); }
+        else if (act === 'tache') {
+          var n = D.notes.filter(function(x){ return x.id === id; })[0];
+          ouvrirNouvelle(n.domaine, n.type === 'Texte' ? n.contenu : (n.type + ' du ' + dateLisible(n.date) + ' à traiter'), id);
+          if (n.lien) $('n-desc').value = (n.contenu ? n.contenu + '\n' : '') + (n.type || 'Pièce') + ' : ' + n.lien;
+        }
+        else if (act === 'modifier') { editerNote(el, id); }
       };
     });
     el.querySelectorAll('u[data-tache]').forEach(function(u){ u.onclick = function(ev){ ev.stopPropagation(); ouvrirDetail(u.dataset.tache); }; });
@@ -656,8 +683,11 @@ function rendreDetail(){
   var notes = D.notes.filter(function(n){ return n.tache === t.id; }).sort(function(a, b){ return a.date < b.date ? 1 : -1; });
   var h = '<div class="poignee"></div>' +
     '<div class="entete-detail"><span class="pastille ' + cls + '">' + ech(t.domaine) + '</span><span>' + ech(t.categorie) + '</span><span>' + ech(t.id) + '</span>' + (t.score !== null ? '<span class="pastille ' + classeQuad(t) + '" style="background:var(--gris)">score ' + Math.round(t.score) + '</span>' : '') + '</div>' +
-    '<h2 id="d-titre" contenteditable="true" style="outline:none;border-bottom:1px dashed var(--bord)">' + ech(t.titre) + '</h2>' +
+    '<h2>' + ech(t.titre) + '</h2>' +
     '<div class="aide" style="margin-top:-4px">' + (t.quadrant ? ech(t.quadrant) + ' · ' : '') + joursTexte(t) + ' · créée ' + dateLisible(t.creeLe) + (t.creePar ? ' par ' + ech(t.creePar) : '') + (t.recurrence ? ' · récurrence ' + ech(t.recurrence) : '') + '</div>' +
+    '<label>✏️ Titre</label><div style="display:flex;gap:6px"><input id="d-titre-edit" value="' + ech(t.titre) + '"><button class="chip" id="d-titre-ok" style="flex-shrink:0">OK</button></div>' +
+    '<label>Domaine</label><div class="seg" id="d-dom"><button data-v="Pharmacie"' + (t.domaine !== 'Maison' ? ' class="actif"' : '') + '>Pharmacie</button><button data-v="Maison"' + (t.domaine === 'Maison' ? ' class="actif"' : '') + '>Maison</button></div>' +
+    '<label>Catégorie</label><div style="display:flex;gap:6px"><select id="d-cat">' + (D.params.categories[t.domaine === 'Maison' ? 'Maison' : 'Pharmacie'] || []).map(function(c){ return '<option' + (c === t.categorie ? ' selected' : '') + '>' + ech(c) + '</option>'; }).join('') + '</select><button class="chip" id="d-cat-ok" style="flex-shrink:0">OK</button></div>' +
     '<label>Statut</label><div class="seg" id="d-statut">' + D.params.statuts.map(function(s){ return '<button data-v="' + ech(s) + '"' + (s === t.statut ? ' class="actif"' : '') + '>' + ech(s) + '</button>'; }).join('') + '</div>' +
     '<label>Avancement' + (sous.length ? ' (calculé d\'après les sous-tâches)' : '') + '</label><div class="range"><input type="range" min="0" max="100" step="5" id="d-avance" value="' + Math.round(t.avancement * 100) + '"' + (sous.length ? ' disabled' : '') + '><b id="d-avance-v">' + Math.round(t.avancement * 100) + ' %</b></div>' +
     '<label>Sous-tâches / étapes</label><div id="d-sous">' + sous.map(function(s){ return '<div class="sous"><input type="checkbox" data-id="' + ech(s.id) + '"' + (s.fait ? ' checked' : '') + '><span class="' + (s.fait ? 'fait' : '') + '">' + ech(s.libelle) + '</span><button data-suppr="' + ech(s.id) + '">×</button></div>'; }).join('') + '</div>' +
@@ -685,7 +715,12 @@ function rendreDetail(){
   });
   $('d-avance').oninput = function(){ $('d-avance-v').textContent = this.value + ' %'; };
   $('d-avance').onchange = function(){ ecrire('modifierTache', [t.id, { avancement: +this.value / 100 }, utilisateur], 'Avancement enregistré').then(rendreDetail); };
-  $('d-titre').addEventListener('blur', function(){ var v = this.textContent.trim(); if (v && v !== t.titre) ecrire('modifierTache', [t.id, { titre: v }, utilisateur], 'Titre modifié').then(rendreDetail); });
+  $('d-titre-ok').onclick = function(){ var v = $('d-titre-edit').value.trim(); if (!v) { toast('Le titre est vide'); return; } if (v !== t.titre) ecrire('modifierTache', [t.id, { titre: v }, utilisateur], 'Titre modifié').then(rendreDetail); };
+  $('d-titre-edit').onkeydown = function(ev){ if (ev.key === 'Enter') { ev.preventDefault(); $('d-titre-ok').click(); } };
+  $('d-dom').addEventListener('click', function(ev){ var b = ev.target.closest('button'); if (!b || b.dataset.v === t.domaine) return; segment('d-dom', b.dataset.v);
+    var cats = D.params.categories[b.dataset.v] || [];
+    ecrire('modifierTache', [t.id, { domaine: b.dataset.v, categorie: cats[0] || '' }, utilisateur], 'Domaine modifié (vérifiez la catégorie)').then(rendreDetail); });
+  $('d-cat-ok').onclick = function(){ var v = $('d-cat').value; if (v !== t.categorie) ecrire('modifierTache', [t.id, { categorie: v }, utilisateur], 'Catégorie modifiée').then(rendreDetail); };
   $('d-ech-ok').onclick = function(){ ecrire('modifierTache', [t.id, { echeance: $('d-ech').value || '' }, utilisateur], 'Échéance enregistrée').then(rendreDetail); };
   $('d-desc-ok').onclick = function(){ ecrire('modifierTache', [t.id, { description: $('d-desc').value.trim() }, utilisateur], 'Description enregistrée').then(rendreDetail); };
   $('d-note-ok').onclick = function(){ var v = $('d-note').value.trim(); if (!v) return; ecrire('ajouterNote', [{ domaine: t.domaine, tache: t.id, type: 'Texte', contenu: v }, utilisateur], 'Note ajoutée').then(rendreDetail); };
