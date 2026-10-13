@@ -37,6 +37,7 @@
   .decision{margin:8px 0 4px;padding:8px;border-radius:8px;background:#f0f6ff;font-size:14px}
   .decision b{color:var(--bleu)}
   .note{font-size:14px;margin:6px 0}
+  .verif{font-size:13px;margin:6px 0;padding:8px;border-radius:8px;background:#ecfdf3;color:#05603a}
   details{font-size:14px;color:#344054;margin-top:4px} summary{color:var(--bleu);cursor:pointer}
   .incert{color:var(--orange);font-size:13px;margin-top:4px}
   .actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
@@ -106,6 +107,17 @@
 <script>
 var JETON = null, FICHES = [], DECISIONS = [], FILTRE = 'À valider';
 var ORDRE = {Urgente:0, Haute:1, Moyenne:2, Basse:3};
+var EXPLI = {
+  'Suivi RJ': "Nouvelle pièce à payer : elle n'est pas encore dans le fichier RJ, je propose de l'y ajouter.",
+  'Déjà au suivi RJ': "Cette pièce est déjà dans le fichier RJ : rien à ajouter, il reste à suivre son paiement.",
+  'Créance antérieure': "Facture d'avant le 30/06 : ne pas payer, elle se déclare au mandataire.",
+  'À vérifier': "Je ne peux pas trancher seul : un point est à contrôler (pièce jointe, date) avant de décider.",
+  'Action à faire': "Il faut répondre, appeler ou signer quelque chose.",
+  'Prestataire à payer': "Facture d'un prestataire (abonnement, maintenance…), hors circuit laboratoire.",
+  'Information': "Rien à payer : simple information à ranger.",
+  'Doublon': "Même pièce qu'un autre mail : une seule ligne suffit.",
+  'Sans intérêt': "Publicité, code de connexion ou notification."
+};
 function rang(f){ var r = ORDRE[f['Priorité']]; return r === undefined ? 9 : r; }
 
 try { var j = JSON.parse(localStorage.getItem('triRJ_jeton') || 'null'); if (j && j.exp > Date.now()) JETON = j.v; } catch(e) {}
@@ -185,7 +197,10 @@ function carte(f){
     '<div class="ligne1"><div><span class="badge p-' + esc(f['Priorité']) + '">' + esc(f['Priorité']) + '</span><span class="tiers">' + esc(f['Tiers']) + '</span>' +
       '<div class="meta">' + esc(f['Type']) + ' · reçu le ' + esc(f['Date mail']) + (f['Références'] ? ' · ' + esc(f['Références']) : '') + '</div></div>' +
       '<div class="montant">' + esc(f['Montant TTC']) + '</div></div>' +
-    '<div class="decision">Proposition : <b>' + esc(f['Décision proposée']) + '</b> · étiquette <b>' + esc(f['Étiquette proposée']) + '</b>' + etiq + '</div>' +
+    '<div class="decision">Ma proposition : <b>' + esc(f['Décision proposée']) + '</b>' +
+      (EXPLI[f['Décision proposée']] ? '<div class="meta">' + esc(EXPLI[f['Décision proposée']]) + '</div>' : '') +
+      '<div class="meta">Étiquette Gmail proposée : ' + esc(f['Étiquette proposée']) + '</div>' + etiq + '</div>' +
+    (f['Vérification'] ? '<div class="verif">🔎 <b>Déjà payé ?</b> ' + esc(f['Vérification']) + '</div>' : '') +
     '<div class="note">' + esc(f['Note de Claude']) + '</div>' +
     '<details><summary>Résumé du mail</summary><p>' + esc(f['Résumé']) + '</p>' +
       (f['Déjà fait'] ? '<p><b>Déjà fait :</b> ' + esc(f['Déjà fait']) + '</p>' : '') +
@@ -197,9 +212,8 @@ function carte(f){
       '<button class="b-voir" onclick="voirMail(\'' + id + '\')">📄 Voir le mail</button>' +
       (traite
         ? '<button class="b-corr" onclick="decider(\'' + id + '\',\'À valider\')">↩︎ Annuler ma décision</button>'
-        : '<button class="b-ok" onclick="decider(\'' + id + '\',\'Validé\')">✓ Valider</button>' +
-          '<button class="b-corr" onclick="corriger(\'' + id + '\')">✎ Corriger</button>' +
-          '<button class="b-non" onclick="refuser(\'' + id + '\')">✗</button>') +
+        : '<button class="b-ok" onclick="decider(\'' + id + '\',\'Validé\')">✓ D\'accord</button>' +
+          '<button class="b-corr" onclick="corriger(\'' + id + '\')">✎ Changer / noter</button>') +
     '</div></div>';
 }
 
@@ -225,12 +239,12 @@ function refuser(id){
 
 function corriger(id){
   var f = trouver(id);
-  document.getElementById('mTitre').textContent = 'Corriger — ' + f['Tiers'];
+  document.getElementById('mTitre').textContent = 'Changer la décision ou ajouter une note — ' + f['Tiers'];
   document.getElementById('mCorps').innerHTML =
-    '<div class="champ"><label>Décision</label><select id="cDec">' + DECISIONS.map(function(d){
+    '<p class="meta">Choisissez la bonne décision si ma proposition est fausse, et/ou écrivez une note. Rien n\'est envoyé ni modifié dans Gmail.</p><div class="champ"><label>Décision</label><select id="cDec">' + DECISIONS.map(function(d){
       return '<option' + (d === f['Décision proposée'] ? ' selected' : '') + '>' + esc(d) + '</option>'; }).join('') + '</select></div>' +
     '<div class="champ"><label>Étiquette Gmail</label><input id="cEtiq" value="' + esc(f['Étiquette proposée']) + '"></div>' +
-    '<div class="champ"><label>Commentaire (montant à virer, consigne…)</label><textarea id="cCom" rows="3"></textarea></div>' +
+    '<div class="champ"><label>Votre note (ex. « déjà payé le 08/10 », montant à virer, consigne…)</label><textarea id="cCom" rows="3"></textarea></div>' +
     '<button class="btn b-ok" style="width:100%" onclick="decider(\'' + esc(id) + '\',\'Corrigé\',document.getElementById(\'cDec\').value,document.getElementById(\'cEtiq\').value,document.getElementById(\'cCom\').value)">Enregistrer</button>';
   ouvrir();
 }
