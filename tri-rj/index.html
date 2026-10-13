@@ -206,7 +206,9 @@ function carte(f){
       (f['Déjà fait'] ? '<p><b>Déjà fait :</b> ' + esc(f['Déjà fait']) + '</p>' : '') +
       '<p><b>Antériorité :</b> ' + esc(f['Antériorité']) + (f['Date pièce'] ? ' · pièce du ' + esc(f['Date pièce']) : '') + '</p></details>' +
     (f['Incertitudes'] ? '<div class="incert">⚠️ ' + esc(f['Incertitudes']) + '</div>' : '') +
-    (f['Réponse envoyée'] ? '<div class="meta">✉️ Réponse envoyée : ' + esc(f['Réponse envoyée']) + '</div>' : '') +
+    (f['Réponse envoyée'] ? (/^⏰/.test(f['Réponse envoyée'])
+        ? '<div class="meta">' + esc(f['Réponse envoyée']) + ' <a href="#" onclick="annulerEnvoi(\'' + id + '\');return false">annuler l\'envoi</a></div>'
+        : '<div class="meta">✉️ Réponse : ' + esc(f['Réponse envoyée']) + '</div>') : '') +
     (traite ? '<div class="statut st-' + esc(f['Statut']) + '">' + esc(f['Statut']) + (f['Décision finale'] ? ' → ' + esc(f['Décision finale']) : '') +
       (f['Commentaire Pierre'] ? ' · « ' + esc(f['Commentaire Pierre']) + ' »' : '') + ' (' + esc(f['Date validation']) + ')</div>' : '') +
     '<div class="actions">' +
@@ -268,7 +270,7 @@ function repondre(id){
   document.getElementById('mCorps').innerHTML = '<div class="chargement">Préparation de la réponse…</div>';
   ouvrir();
   appel('mob_brouillon', [JETON, id], function(b){
-    REP = { id: id, a: b.a, o: b.objet, t: b.proposition || '', pjs: [], de: b.de, date: b.date };
+    REP = { id: id, a: b.a, o: b.objet, t: b.proposition || '', pjs: [], de: b.de, date: b.date, prog: false, quand: '' };
     afficherReponse();
   }, function(m){ document.getElementById('mCorps').innerHTML = '<div class="erreur">' + esc(m) + '</div>'; });
 }
@@ -282,6 +284,14 @@ function afficherReponse(){
     '<div class="champ"><label>Message' + (REP.t ? ' (texte préparé par Claude, à modifier si besoin)' : '') + '</label><textarea id="rT" rows="8">' + esc(REP.t) + '</textarea></div>' +
     '<div class="champ"><label>Pièces jointes (PDF ou photo, 9 Mo maximum au total)</label>' +
       '<input id="rF" type="file" multiple accept="application/pdf,image/*" onchange="ajouterPJ(this)"><div id="rL"></div></div>' +
+    '<div class="champ"><label>Quand l\'envoyer ?</label>' +
+      '<label style="display:block;color:inherit;font-size:15px"><input type="radio" name="rQ" value="0"' + (REP.prog ? '' : ' checked') + ' onchange="choixEnvoi(false)"> Tout de suite</label>' +
+      '<label style="display:block;color:inherit;font-size:15px"><input type="radio" name="rQ" value="1"' + (REP.prog ? ' checked' : '') + ' onchange="choixEnvoi(true)"> À une date et une heure précises</label>' +
+      '<div id="rProg" style="display:' + (REP.prog ? 'block' : 'none') + ';margin-top:6px">' +
+        '<input id="rD" type="datetime-local" value="' + esc(REP.quand) + '">' +
+        '<div style="margin-top:4px"><button class="pj" onclick="raccourci(1)">Demain 9h</button><button class="pj" onclick="raccourci(2)">Lundi 9h</button><button class="pj" onclick="raccourci(3)">Ce soir 18h</button></div>' +
+        '<p class="meta">Le mail est enregistré dans vos Brouillons Gmail et part automatiquement à l\'heure choisie (à 5 minutes près). Supprimer ce brouillon dans Gmail annule l\'envoi.</p>' +
+      '</div></div>' +
     '<p class="meta">Votre signature est ajoutée automatiquement, avec le message d\'origine en dessous. Le mail reçu garde son état lu / non lu.</p>' +
     '<div id="rErr" class="erreur"></div>' +
     '<button class="btn b-ok" style="width:100%" onclick="verifierEnvoi()">Vérifier avant d\'envoyer</button>';
@@ -294,7 +304,25 @@ function lireChamps(){
   REP.a = document.getElementById('rA').value.trim();
   REP.o = document.getElementById('rO').value.trim();
   REP.t = document.getElementById('rT').value;
+  REP.quand = document.getElementById('rD') ? document.getElementById('rD').value : '';
 }
+
+function choixEnvoi(prog){
+  REP.prog = prog;
+  document.getElementById('rProg').style.display = prog ? 'block' : 'none';
+  if (prog && !document.getElementById('rD').value) raccourci(1);
+}
+
+function deuxChiffres(n){ return (n < 10 ? '0' : '') + n; }
+function versChamp(d){ return d.getFullYear() + '-' + deuxChiffres(d.getMonth() + 1) + '-' + deuxChiffres(d.getDate()) + 'T' + deuxChiffres(d.getHours()) + ':' + deuxChiffres(d.getMinutes()); }
+function raccourci(k){
+  var d = new Date();
+  if (k === 1) { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); }
+  if (k === 2) { var j = (8 - d.getDay()) % 7 || 7; d.setDate(d.getDate() + j); d.setHours(9, 0, 0, 0); }
+  if (k === 3) { d.setHours(18, 0, 0, 0); if (d.getTime() < Date.now() + 5 * 60000) d.setDate(d.getDate() + 1); }
+  document.getElementById('rD').value = versChamp(d);
+}
+function lisible(v){ var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(v || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] + ' à ' + m[4] + 'h' + m[5] : v; }
 
 function modele(k){
   var t = document.getElementById('rT');
@@ -326,32 +354,63 @@ function listePJ(){
   }).join('');
 }
 
+function annulerEnvoi(id){
+  var f = trouver(id);
+  document.getElementById('mTitre').textContent = 'Annuler l\'envoi programmé — ' + f['Tiers'];
+  document.getElementById('mCorps').innerHTML = '<p>' + esc(f['Réponse envoyée']) + '</p><p>Le brouillon sera supprimé et le mail ne partira pas.</p><div id="rErr" class="erreur"></div>' +
+    '<div class="actions"><button class="btn b-voir" onclick="fermer()">Garder l\'envoi</button><button id="rAnn" class="btn b-non" onclick="confirmerAnnulation(\'' + esc(id) + '\')">Annuler l\'envoi</button></div>';
+  ouvrir();
+}
+function confirmerAnnulation(id){
+  var b = document.getElementById('rAnn'); b.disabled = true; b.textContent = 'Annulation…';
+  appel('mob_annulerEnvoi', [JETON, id], function(){
+    trouver(id)['Réponse envoyée'] = '';
+    fermer(); afficher();
+  }, function(m){ document.getElementById('rErr').textContent = m; b.disabled = false; b.textContent = 'Annuler l\'envoi'; });
+}
+
 function verifierEnvoi(){
   lireChamps();
   var err = document.getElementById('rErr');
   if (!/^[^@\s,;]+@[^@\s,;]+\.[A-Za-z]{2,}([,;]\s*[^@\s,;]+@[^@\s,;]+\.[A-Za-z]{2,})*$/.test(REP.a)) { err.textContent = 'Adresse du destinataire invalide.'; return; }
   if (!REP.t.trim()) { err.textContent = 'Le message est vide.'; return; }
+  if (REP.prog) {
+    var dt = new Date(REP.quand);
+    if (!REP.quand || isNaN(dt.getTime())) { err.textContent = 'Choisissez la date et l\'heure d\'envoi.'; return; }
+    if (dt.getTime() < Date.now() + 2 * 60000) { err.textContent = 'La date d\'envoi doit être dans le futur.'; return; }
+  }
   document.getElementById('mCorps').innerHTML =
     '<p><b>Vous allez envoyer ce mail :</b></p>' +
     '<div class="meta">À : <b>' + esc(REP.a) + '</b></div>' +
     '<div class="meta">Objet : ' + esc(REP.o) + '</div>' +
+    '<div class="meta">Envoi : <b>' + (REP.prog ? '⏰ le ' + esc(lisible(REP.quand)) : 'tout de suite') + '</b></div>' +
     '<pre style="white-space:pre-wrap;font-family:inherit;background:#f8f9fb;padding:10px;border-radius:8px">' + esc(REP.t) + '\n\n--\nCordialement.\nMr Pierre GOUIN…</pre>' +
     (REP.pjs.length ? REP.pjs.map(function(p){ return '<div class="meta">📎 ' + esc(p.nom) + '</div>'; }).join('') : '<div class="meta">Aucune pièce jointe.</div>') +
     '<div id="rErr" class="erreur"></div>' +
     '<div class="actions"><button class="btn b-voir" onclick="afficherReponse()">← Modifier</button>' +
-    '<button id="rEnv" class="btn b-ok" onclick="envoyerReponse()">✉️ Envoyer maintenant</button></div>';
+    '<button id="rEnv" class="btn b-ok" onclick="envoyerReponse()">' + (REP.prog ? '⏰ Programmer l\'envoi' : '✉️ Envoyer maintenant') + '</button></div>';
 }
 
 function envoyerReponse(){
-  var b = document.getElementById('rEnv'); b.disabled = true; b.textContent = 'Envoi en cours…';
-  appel('mob_repondre', [JETON, REP.id, REP.a, REP.o, REP.t, REP.pjs], function(r){
-    var f = trouver(REP.id); if (f) f['Réponse envoyée'] = r.quand + ' à ' + r.a;
+  var b = document.getElementById('rEnv'); b.disabled = true; b.textContent = REP.prog ? 'Programmation…' : 'Envoi en cours…';
+  appel('mob_repondre', [JETON, REP.id, REP.a, REP.o, REP.t, REP.pjs, REP.prog ? REP.quand : ''], function(r){
+    var f = trouver(REP.id);
+    if (r.programme) {
+      if (f) f['Réponse envoyée'] = '⏰ Programmé pour le ' + r.quand + ' à ' + r.a;
+      afficher();
+      document.getElementById('mCorps').innerHTML = '<p>⏰ Envoi programmé pour le <b>' + esc(r.quand) + '</b> à <b>' + esc(r.a) + '</b>.</p>' +
+        '<p class="meta">Le mail attend dans vos Brouillons Gmail et partira automatiquement (à 5 minutes près). Vous pouvez l\'annuler depuis la fiche.</p>' +
+        '<button class="btn b-voir" style="width:100%" onclick="fermer();afficher()">Fermer</button>';
+      return;
+    }
+    if (f) f['Réponse envoyée'] = r.quand + ' à ' + r.a;
+    afficher();
     document.getElementById('mCorps').innerHTML = '<p>✅ Mail envoyé à <b>' + esc(r.a) + '</b> le ' + esc(r.quand) + '.</p>' +
       '<p class="meta">Il apparaît dans les « Messages envoyés » de Gmail. Pensez à valider la fiche si c\'est terminé.</p>' +
       '<button class="btn b-voir" style="width:100%" onclick="fermer();afficher()">Fermer</button>';
   }, function(m){
     document.getElementById('rErr').textContent = 'Non envoyé : ' + m;
-    b.disabled = false; b.textContent = '✉️ Réessayer';
+    b.disabled = false; b.textContent = REP.prog ? '⏰ Réessayer' : '✉️ Réessayer';
   });
 }
 
