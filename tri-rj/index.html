@@ -133,10 +133,16 @@ function appel(fn, args, ok, ko){
     if (msg.indexOf('SESSION_EXPIREE') >= 0) { deconnexion('Session expirée : entrez à nouveau votre code.'); return; }
     if (ko) ko(msg); else alert(msg);
   };
-  fetch(API, { method: 'POST', body: JSON.stringify({ fn: fn, args: args }), headers: { 'Content-Type': 'text/plain;charset=utf-8' } })
-    .then(function(r){ return r.json(); })
-    .then(function(r){ if (r.ok) { if (ok) ok(r.data); } else echec(r.erreur || 'Erreur inconnue'); })
-    .catch(function(){ echec('Connexion impossible. Vérifiez le réseau puis réessayez.'); });
+  var essai = function(n){
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var minuterie = ctrl ? setTimeout(function(){ ctrl.abort(); }, 45000) : null;
+    fetch(API + '?t=' + Date.now(), { method: 'POST', cache: 'no-store', signal: ctrl ? ctrl.signal : undefined,
+        body: JSON.stringify({ fn: fn, args: args }), headers: { 'Content-Type': 'text/plain;charset=utf-8' } })
+      .then(function(r){ return r.json(); })
+      .then(function(r){ clearTimeout(minuterie); if (r.ok) { if (ok) ok(r.data); } else echec(r.erreur || 'Erreur inconnue'); })
+      .catch(function(){ clearTimeout(minuterie); if (n < 1) essai(n + 1); else echec('Connexion impossible. Vérifiez le réseau puis réessayez.'); });
+  };
+  essai(0);
 }
 
 function connexion(){
