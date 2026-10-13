@@ -206,10 +206,12 @@ function carte(f){
       (f['Déjà fait'] ? '<p><b>Déjà fait :</b> ' + esc(f['Déjà fait']) + '</p>' : '') +
       '<p><b>Antériorité :</b> ' + esc(f['Antériorité']) + (f['Date pièce'] ? ' · pièce du ' + esc(f['Date pièce']) : '') + '</p></details>' +
     (f['Incertitudes'] ? '<div class="incert">⚠️ ' + esc(f['Incertitudes']) + '</div>' : '') +
+    (f['Réponse envoyée'] ? '<div class="meta">✉️ Réponse envoyée : ' + esc(f['Réponse envoyée']) + '</div>' : '') +
     (traite ? '<div class="statut st-' + esc(f['Statut']) + '">' + esc(f['Statut']) + (f['Décision finale'] ? ' → ' + esc(f['Décision finale']) : '') +
       (f['Commentaire Pierre'] ? ' · « ' + esc(f['Commentaire Pierre']) + ' »' : '') + ' (' + esc(f['Date validation']) + ')</div>' : '') +
     '<div class="actions">' +
       '<button class="b-voir" onclick="voirMail(\'' + id + '\')">📄 Voir le mail</button>' +
+      '<button class="b-voir" onclick="repondre(\'' + id + '\')">✉️ Répondre' + (f['Réponse proposée'] ? ' (texte prêt)' : '') + '</button>' +
       (traite
         ? '<button class="b-corr" onclick="decider(\'' + id + '\',\'À valider\')">↩︎ Annuler ma décision</button>'
         : '<button class="b-ok" onclick="decider(\'' + id + '\',\'Validé\')">✓ D\'accord</button>' +
@@ -249,6 +251,110 @@ function corriger(id){
   ouvrir();
 }
 
+/* ---------- Répondre depuis le téléphone ---------- */
+var MODELES = {
+  'Preuve de virement': "Bonjour,\nci-joint la preuve de virement. Merci de libérer la commande s'il vous plaît.",
+  'Demande de RIB': "Bonjour,\npourriez-vous me transmettre votre RIB s'il vous plaît afin de régler cette facture.",
+  'Demande de relevé': "Bonjour,\npourriez-vous m'envoyer le relevé à jour de notre compte client, avec le détail des factures (numéro, date, montant) et des règlements déjà reçus, s'il vous plaît.",
+  'Facture antérieure': "Bonjour,\nla pharmacie est en redressement judiciaire. Les factures antérieures au jugement ne peuvent pas être réglées directement : elles doivent être déclarées auprès du mandataire judiciaire."
+};
+var REP = null;
+var MAX_PJ = 9 * 1024 * 1024;
+
+function repondre(id){
+  var f = trouver(id);
+  MAIL_ID = id;
+  document.getElementById('mTitre').textContent = 'Répondre — ' + f['Tiers'];
+  document.getElementById('mCorps').innerHTML = '<div class="chargement">Préparation de la réponse…</div>';
+  ouvrir();
+  appel('mob_brouillon', [JETON, id], function(b){
+    REP = { id: id, a: b.a, o: b.objet, t: b.proposition || '', pjs: [], de: b.de, date: b.date };
+    afficherReponse();
+  }, function(m){ document.getElementById('mCorps').innerHTML = '<div class="erreur">' + esc(m) + '</div>'; });
+}
+
+function afficherReponse(){
+  var h = '<p class="meta">Réponse au message de ' + esc(REP.de) + ' du ' + esc(REP.date) + '.</p>' +
+    '<div class="champ"><label>À</label><input id="rA" value="' + esc(REP.a) + '"></div>' +
+    '<div class="champ"><label>Objet</label><input id="rO" value="' + esc(REP.o) + '"></div>' +
+    '<div class="champ"><label>Textes rapides (s\'ajoutent au message)</label><div>' +
+      Object.keys(MODELES).map(function(k){ return '<button class="pj" onclick="modele(\'' + k.replace(/'/g, "\\'") + '\')">' + esc(k) + '</button>'; }).join('') + '</div></div>' +
+    '<div class="champ"><label>Message' + (REP.t ? ' (texte préparé par Claude, à modifier si besoin)' : '') + '</label><textarea id="rT" rows="8">' + esc(REP.t) + '</textarea></div>' +
+    '<div class="champ"><label>Pièces jointes (PDF ou photo, 9 Mo maximum au total)</label>' +
+      '<input id="rF" type="file" multiple accept="application/pdf,image/*" onchange="ajouterPJ(this)"><div id="rL"></div></div>' +
+    '<p class="meta">Votre signature est ajoutée automatiquement, avec le message d\'origine en dessous. Le mail reçu garde son état lu / non lu.</p>' +
+    '<div id="rErr" class="erreur"></div>' +
+    '<button class="btn b-ok" style="width:100%" onclick="verifierEnvoi()">Vérifier avant d\'envoyer</button>';
+  document.getElementById('mCorps').innerHTML = h;
+  listePJ();
+}
+
+function lireChamps(){
+  if (!document.getElementById('rA')) return;
+  REP.a = document.getElementById('rA').value.trim();
+  REP.o = document.getElementById('rO').value.trim();
+  REP.t = document.getElementById('rT').value;
+}
+
+function modele(k){
+  var t = document.getElementById('rT');
+  t.value = t.value.trim() ? t.value.replace(/\s+$/, '') + '\n\n' + MODELES[k] : MODELES[k];
+}
+
+function poidsPJ(){ return REP.pjs.reduce(function(s, p){ return s + Math.floor(p.b64.length * 3 / 4); }, 0); }
+
+function ajouterPJ(input){
+  var fichiers = Array.prototype.slice.call(input.files || []);
+  var err = document.getElementById('rErr'); err.textContent = '';
+  fichiers.forEach(function(fi){
+    if (poidsPJ() + fi.size > MAX_PJ) { err.textContent = fi.name + ' : trop lourd (9 Mo maximum au total).'; return; }
+    var lect = new FileReader();
+    lect.onload = function(){
+      var url = String(lect.result);
+      REP.pjs.push({ nom: fi.name, type: fi.type || 'application/octet-stream', b64: url.slice(url.indexOf(',') + 1) });
+      listePJ();
+    };
+    lect.readAsDataURL(fi);
+  });
+  input.value = '';
+}
+
+function listePJ(){
+  var z = document.getElementById('rL'); if (!z) return;
+  z.innerHTML = REP.pjs.map(function(p, i){
+    return '<div class="meta">📎 ' + esc(p.nom) + ' (' + Math.ceil(p.b64.length * 3 / 4 / 1024) + ' Ko) <a href="#" onclick="REP.pjs.splice(' + i + ',1);listePJ();return false">retirer</a></div>';
+  }).join('');
+}
+
+function verifierEnvoi(){
+  lireChamps();
+  var err = document.getElementById('rErr');
+  if (!/^[^@\s,;]+@[^@\s,;]+\.[A-Za-z]{2,}([,;]\s*[^@\s,;]+@[^@\s,;]+\.[A-Za-z]{2,})*$/.test(REP.a)) { err.textContent = 'Adresse du destinataire invalide.'; return; }
+  if (!REP.t.trim()) { err.textContent = 'Le message est vide.'; return; }
+  document.getElementById('mCorps').innerHTML =
+    '<p><b>Vous allez envoyer ce mail :</b></p>' +
+    '<div class="meta">À : <b>' + esc(REP.a) + '</b></div>' +
+    '<div class="meta">Objet : ' + esc(REP.o) + '</div>' +
+    '<pre style="white-space:pre-wrap;font-family:inherit;background:#f8f9fb;padding:10px;border-radius:8px">' + esc(REP.t) + '\n\n--\nCordialement.\nMr Pierre GOUIN…</pre>' +
+    (REP.pjs.length ? REP.pjs.map(function(p){ return '<div class="meta">📎 ' + esc(p.nom) + '</div>'; }).join('') : '<div class="meta">Aucune pièce jointe.</div>') +
+    '<div id="rErr" class="erreur"></div>' +
+    '<div class="actions"><button class="btn b-voir" onclick="afficherReponse()">← Modifier</button>' +
+    '<button id="rEnv" class="btn b-ok" onclick="envoyerReponse()">✉️ Envoyer maintenant</button></div>';
+}
+
+function envoyerReponse(){
+  var b = document.getElementById('rEnv'); b.disabled = true; b.textContent = 'Envoi en cours…';
+  appel('mob_repondre', [JETON, REP.id, REP.a, REP.o, REP.t, REP.pjs], function(r){
+    var f = trouver(REP.id); if (f) f['Réponse envoyée'] = r.quand + ' à ' + r.a;
+    document.getElementById('mCorps').innerHTML = '<p>✅ Mail envoyé à <b>' + esc(r.a) + '</b> le ' + esc(r.quand) + '.</p>' +
+      '<p class="meta">Il apparaît dans les « Messages envoyés » de Gmail. Pensez à valider la fiche si c\'est terminé.</p>' +
+      '<button class="btn b-voir" style="width:100%" onclick="fermer();afficher()">Fermer</button>';
+  }, function(m){
+    document.getElementById('rErr').textContent = 'Non envoyé : ' + m;
+    b.disabled = false; b.textContent = '✉️ Réessayer';
+  });
+}
+
 /* ---------- Lecture du mail et des pièces jointes ---------- */
 var MAIL_ID = null;
 function voirMail(id){
@@ -265,7 +371,8 @@ function voirMail(id){
           return '<button class="pj" onclick="voirPJ(' + p.mi + ',' + p.ai + ')">📎 ' + esc(p.nom) + ' (' + Math.ceil(p.taille/1024) + ' Ko)</button>'; }).join('') + '</div>' : '') +
         '<pre>' + esc(m.corps) + '</pre></div>';
     }).join('');
-    h += '<p style="font-size:13px;color:#667085">Besoin de répondre ? <a href="#" onclick="ouvrirGmail();return false">Ouvrir dans Gmail</a> (le mail sera alors marqué comme lu).</p>';
+    h += '<button class="btn b-ok" style="width:100%;margin-bottom:8px" onclick="repondre(MAIL_ID)">✉️ Répondre depuis l\'application</button>';
+    h += '<p style="font-size:13px;color:#667085">Ou <a href="#" onclick="ouvrirGmail();return false">ouvrir dans Gmail</a> (le mail sera alors marqué comme lu).</p>';
     document.getElementById('mCorps').innerHTML = h;
   }, function(m){ document.getElementById('mCorps').innerHTML = '<div class="erreur">' + esc(m) + '</div>'; });
 }
