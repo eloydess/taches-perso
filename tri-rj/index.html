@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Tri & RJ</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icone-180.png">
+<link rel="icon" type="image/png" href="icone-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tri & RJ">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#1f3a5f">
+<style>
+  :root{--fond:#f4f5f7;--carte:#fff;--txt:#1d2433;--doux:#667085;--bord:#e3e6eb;--bleu:#1f3a5f;--vert:#1e7b4f;--rouge:#b42318;--orange:#b54708;--jaune:#fef0c7;}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--fond);color:var(--txt)}
+  header{position:sticky;top:0;z-index:5;background:var(--bleu);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 14px 10px}
+  header h1{font-size:16px;margin:0 0 8px}
+  .onglets{display:flex;gap:6px}
+  .onglets button{flex:1;border:0;border-radius:8px;padding:8px;background:rgba(255,255,255,.15);color:#fff;font-weight:600}
+  .onglets button.actif{background:#fff;color:var(--bleu)}
+  .bandeau{background:var(--jaune);color:#7a4a00;font-size:13px;padding:6px 14px}
+  main{padding:12px;max-width:760px;margin:0 auto}
+  .filtres{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto}
+  .filtres button{border:1px solid var(--bord);background:#fff;border-radius:16px;padding:6px 12px;white-space:nowrap}
+  .filtres button.actif{background:var(--bleu);color:#fff;border-color:var(--bleu)}
+  .carte{background:var(--carte);border:1px solid var(--bord);border-radius:12px;padding:12px;margin-bottom:10px}
+  .ligne1{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+  .tiers{font-weight:700;font-size:16px}
+  .montant{font-weight:700;white-space:nowrap}
+  .meta{color:var(--doux);font-size:13px;margin-top:2px}
+  .badge{display:inline-block;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:600;margin-right:4px}
+  .p-Urgente{background:#fee4e2;color:var(--rouge)} .p-Haute{background:#fef0c7;color:var(--orange)}
+  .p-Moyenne{background:#e0eaff;color:#2948a3} .p-Basse{background:#eef0f3;color:var(--doux)}
+  .decision{margin:8px 0 4px;padding:8px;border-radius:8px;background:#f0f6ff;font-size:14px}
+  .decision b{color:var(--bleu)}
+  .note{font-size:14px;margin:6px 0}
+  details{font-size:14px;color:#344054;margin-top:4px} summary{color:var(--bleu);cursor:pointer}
+  .incert{color:var(--orange);font-size:13px;margin-top:4px}
+  .actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+  .actions button,.btn{border:0;border-radius:8px;padding:9px 12px;font-weight:600;font-size:14px}
+  .b-voir{background:#eef0f3;color:var(--txt)} .b-ok{background:var(--vert);color:#fff;flex:1}
+  .b-corr{background:#e0eaff;color:#2948a3} .b-non{background:#fee4e2;color:var(--rouge)}
+  .statut{font-size:13px;font-weight:600;margin-top:6px}
+  .st-Validé,.st-Corrigé{color:var(--vert)} .st-Refusé{color:var(--rouge)}
+  .vide{text-align:center;color:var(--doux);padding:40px 0}
+  #connexion{max-width:320px;margin:80px auto;text-align:center}
+  #connexion input{font-size:24px;text-align:center;letter-spacing:8px;width:100%;padding:10px;border:1px solid var(--bord);border-radius:10px}
+  #connexion button{margin-top:12px;width:100%;background:var(--bleu);color:#fff;padding:12px}
+  .erreur{color:var(--rouge);margin-top:10px;font-size:14px}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:none}
+  .modal .boite{position:absolute;inset:4% 3%;background:#fff;border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+  .modal .tete{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--bord);gap:8px}
+  .modal .tete b{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .modal .corps{overflow:auto;padding:12px;-webkit-overflow-scrolling:touch}
+  .msg{border-bottom:1px solid var(--bord);padding-bottom:12px;margin-bottom:12px}
+  .msg pre{white-space:pre-wrap;font:14px/1.45 inherit;font-family:inherit;margin:8px 0}
+  .pj{display:inline-block;margin:4px 6px 0 0;border:1px solid var(--bord);border-radius:8px;padding:6px 9px;background:#f8f9fb;font-size:13px}
+  canvas{width:100%;height:auto;border:1px solid var(--bord);margin-bottom:8px}
+  .champ{margin:10px 0} .champ label{display:block;font-size:13px;color:var(--doux);margin-bottom:4px}
+  .champ select,.champ input,.champ textarea{width:100%;padding:9px;border:1px solid var(--bord);border-radius:8px;font-size:15px}
+  .chargement{color:var(--doux);padding:20px;text-align:center}
+  table.rj{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
+  table.rj td,table.rj th{border-bottom:1px solid var(--bord);padding:6px;text-align:left;vertical-align:top}
+</style>
+</head>
+<body>
+
+<div id="connexion">
+  <h2>🔒 Pharmacie — Tri & RJ</h2>
+  <p>Code d'accès</p>
+  <input id="code" type="password" inputmode="numeric" maxlength="6" autocomplete="off">
+  <button class="btn" onclick="connexion()">Entrer</button>
+  <div id="errConn" class="erreur"></div>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <h1>Pharmacie — Tri boîte mail & Paiements RJ</h1>
+    <div class="onglets">
+      <button id="oMail" class="actif" onclick="vue('mail')">📬 Boîte mail</button>
+      <button id="oRJ" onclick="vue('rj')">💶 Paiements RJ</button>
+    </div>
+  </header>
+  <div class="bandeau">Mode test : vos décisions sont enregistrées, Gmail n'est pas modifié et les mails restent dans leur état lu / non lu.</div>
+  <main>
+    <section id="vMail">
+      <div class="filtres" id="filtres"></div>
+      <div id="liste"><div class="chargement">Chargement…</div></div>
+    </section>
+    <section id="vRJ" style="display:none">
+      <p style="font-size:14px;color:#344054">Mails validés « Suivi RJ », en attente de transfert vers le fichier RJ (après sa refonte). Le fichier RJ actuel reste la référence pour les virements.</p>
+      <div id="tampon"><div class="chargement">Chargement…</div></div>
+    </section>
+  </main>
+</div>
+
+<div class="modal" id="modal"><div class="boite">
+  <div class="tete"><b id="mTitre"></b><button class="btn b-voir" onclick="fermer()">Fermer</button></div>
+  <div class="corps" id="mCorps"></div>
+</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+var JETON = null, FICHES = [], DECISIONS = [], FILTRE = 'À valider';
+var ORDRE = {Urgente:0, Haute:1, Moyenne:2, Basse:3};
+function rang(f){ var r = ORDRE[f['Priorité']]; return r === undefined ? 9 : r; }
+
+try { var j = JSON.parse(localStorage.getItem('triRJ_jeton') || 'null'); if (j && j.exp > Date.now()) JETON = j.v; } catch(e) {}
+if (JETON) { demarrer(); }
+
+document.getElementById('code').addEventListener('keyup', function(e){ if (e.key === 'Enter') connexion(); });
+
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+var API = 'https://script.google.com/macros/s/AKfycbxaL37ZTZwlNcn9G5Cf_BjdiQkJ4rgpxpskiJ3TkNgqfmWMcFzrLI-sSedImWCBj_E/exec';
+function appel(fn, args, ok, ko){
+  var echec = function(msg){
+    if (msg.indexOf('SESSION_EXPIREE') >= 0) { deconnexion('Session expirée : entrez à nouveau votre code.'); return; }
+    if (ko) ko(msg); else alert(msg);
+  };
+  fetch(API, { method: 'POST', body: JSON.stringify({ fn: fn, args: args }), headers: { 'Content-Type': 'text/plain;charset=utf-8' } })
+    .then(function(r){ return r.json(); })
+    .then(function(r){ if (r.ok) { if (ok) ok(r.data); } else echec(r.erreur || 'Erreur inconnue'); })
+    .catch(function(){ echec('Connexion impossible. Vérifiez le réseau puis réessayez.'); });
+}
+
+function connexion(){
+  var code = document.getElementById('code').value;
+  document.getElementById('errConn').textContent = '';
+  appel('mob_connexion', [code], function(j){
+    JETON = j; try { localStorage.setItem('triRJ_jeton', JSON.stringify({ v: j, exp: Date.now() + 5.5*3600*1000 })); } catch(e) {}
+    demarrer();
+  }, function(m){ document.getElementById('errConn').textContent = m; });
+}
+
+function deconnexion(msg){
+  JETON = null; try { localStorage.removeItem('triRJ_jeton'); } catch(e) {}
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('connexion').style.display = 'block';
+  document.getElementById('errConn').textContent = msg || '';
+}
+
+function demarrer(){
+  document.getElementById('connexion').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  charger();
+}
+
+function charger(){
+  appel('mob_liste', [JETON], function(r){
+    FICHES = r.fiches; DECISIONS = r.decisions;
+    FICHES.sort(function(a,b){ return rang(a) - rang(b) || String(b['Date mail']).localeCompare(String(a['Date mail'])); });
+    afficher();
+  });
+}
+
+function vue(v){
+  document.getElementById('vMail').style.display = v === 'mail' ? '' : 'none';
+  document.getElementById('vRJ').style.display = v === 'rj' ? '' : 'none';
+  document.getElementById('oMail').className = v === 'mail' ? 'actif' : '';
+  document.getElementById('oRJ').className = v === 'rj' ? 'actif' : '';
+  if (v === 'rj') chargerTampon();
+}
+
+function afficher(){
+  var nb = function(s){ return FICHES.filter(function(f){ return s === 'Traités' ? f['Statut'] !== 'À valider' : f['Statut'] === s; }).length; };
+  var choix = ['À valider', 'Traités'];
+  document.getElementById('filtres').innerHTML = choix.map(function(c){
+    return '<button class="' + (c === FILTRE ? 'actif' : '') + '" onclick="FILTRE=\'' + c + '\';afficher()">' + c + ' (' + nb(c) + ')</button>';
+  }).join('');
+  var l = FICHES.filter(function(f){ return FILTRE === 'Traités' ? f['Statut'] !== 'À valider' : f['Statut'] === FILTRE; });
+  if (!l.length) { document.getElementById('liste').innerHTML = '<div class="vide">' + (FILTRE === 'À valider' ? '✅ Tout est traité pour ce lot.' : 'Aucune fiche traitée.') + '</div>'; return; }
+  document.getElementById('liste').innerHTML = l.map(carte).join('');
+}
+
+function carte(f){
+  var id = esc(f['ID']);
+  var etiq = f['Étiquette actuelle'] && f['Étiquette actuelle'] !== '(aucune)' && f['Étiquette actuelle'] !== f['Étiquette proposée']
+    ? '<div class="meta">Étiquette actuelle : ' + esc(f['Étiquette actuelle']) + '</div>' : '';
+  var traite = f['Statut'] !== 'À valider';
+  return '<div class="carte">' +
+    '<div class="ligne1"><div><span class="badge p-' + esc(f['Priorité']) + '">' + esc(f['Priorité']) + '</span><span class="tiers">' + esc(f['Tiers']) + '</span>' +
+      '<div class="meta">' + esc(f['Type']) + ' · reçu le ' + esc(f['Date mail']) + (f['Références'] ? ' · ' + esc(f['Références']) : '') + '</div></div>' +
+      '<div class="montant">' + esc(f['Montant TTC']) + '</div></div>' +
+    '<div class="decision">Proposition : <b>' + esc(f['Décision proposée']) + '</b> · étiquette <b>' + esc(f['Étiquette proposée']) + '</b>' + etiq + '</div>' +
+    '<div class="note">' + esc(f['Note de Claude']) + '</div>' +
+    '<details><summary>Résumé du mail</summary><p>' + esc(f['Résumé']) + '</p>' +
+      (f['Déjà fait'] ? '<p><b>Déjà fait :</b> ' + esc(f['Déjà fait']) + '</p>' : '') +
+      '<p><b>Antériorité :</b> ' + esc(f['Antériorité']) + (f['Date pièce'] ? ' · pièce du ' + esc(f['Date pièce']) : '') + '</p></details>' +
+    (f['Incertitudes'] ? '<div class="incert">⚠️ ' + esc(f['Incertitudes']) + '</div>' : '') +
+    (traite ? '<div class="statut st-' + esc(f['Statut']) + '">' + esc(f['Statut']) + (f['Décision finale'] ? ' → ' + esc(f['Décision finale']) : '') +
+      (f['Commentaire Pierre'] ? ' · « ' + esc(f['Commentaire Pierre']) + ' »' : '') + ' (' + esc(f['Date validation']) + ')</div>' : '') +
+    '<div class="actions">' +
+      '<button class="b-voir" onclick="voirMail(\'' + id + '\')">📄 Voir le mail</button>' +
+      (traite
+        ? '<button class="b-corr" onclick="decider(\'' + id + '\',\'À valider\')">↩︎ Annuler ma décision</button>'
+        : '<button class="b-ok" onclick="decider(\'' + id + '\',\'Validé\')">✓ Valider</button>' +
+          '<button class="b-corr" onclick="corriger(\'' + id + '\')">✎ Corriger</button>' +
+          '<button class="b-non" onclick="refuser(\'' + id + '\')">✗</button>') +
+    '</div></div>';
+}
+
+function trouver(id){ return FICHES.filter(function(f){ return f['ID'] === id; })[0]; }
+
+function decider(id, statut, decision, etiquette, commentaire){
+  appel('mob_decider', [JETON, id, statut, decision || '', etiquette || '', commentaire || ''], function(r){
+    var f = trouver(id);
+    f['Statut'] = r.statut; f['Décision finale'] = r.finale; f['Étiquette finale'] = r.etiquette;
+    f['Commentaire Pierre'] = commentaire || ''; f['Date validation'] = r.statut === 'À valider' ? '' : 'à l\'instant';
+    fermer(); afficher();
+  });
+}
+
+function refuser(id){
+  var f = trouver(id);
+  document.getElementById('mTitre').textContent = 'Refuser — ' + f['Tiers'];
+  document.getElementById('mCorps').innerHTML =
+    '<div class="champ"><label>Pourquoi ? (facultatif)</label><textarea id="rCom" rows="3"></textarea></div>' +
+    '<button class="btn b-non" style="width:100%" onclick="decider(\'' + esc(id) + '\',\'Refusé\',\'\',\'\',document.getElementById(\'rCom\').value)">Refuser la proposition</button>';
+  ouvrir();
+}
+
+function corriger(id){
+  var f = trouver(id);
+  document.getElementById('mTitre').textContent = 'Corriger — ' + f['Tiers'];
+  document.getElementById('mCorps').innerHTML =
+    '<div class="champ"><label>Décision</label><select id="cDec">' + DECISIONS.map(function(d){
+      return '<option' + (d === f['Décision proposée'] ? ' selected' : '') + '>' + esc(d) + '</option>'; }).join('') + '</select></div>' +
+    '<div class="champ"><label>Étiquette Gmail</label><input id="cEtiq" value="' + esc(f['Étiquette proposée']) + '"></div>' +
+    '<div class="champ"><label>Commentaire (montant à virer, consigne…)</label><textarea id="cCom" rows="3"></textarea></div>' +
+    '<button class="btn b-ok" style="width:100%" onclick="decider(\'' + esc(id) + '\',\'Corrigé\',document.getElementById(\'cDec\').value,document.getElementById(\'cEtiq\').value,document.getElementById(\'cCom\').value)">Enregistrer</button>';
+  ouvrir();
+}
+
+/* ---------- Lecture du mail et des pièces jointes ---------- */
+var MAIL_ID = null;
+function voirMail(id){
+  MAIL_ID = id;
+  var f = trouver(id);
+  document.getElementById('mTitre').textContent = f['Tiers'] + ' — ' + f['Objet'];
+  document.getElementById('mCorps').innerHTML = '<div class="chargement">Lecture du mail…</div>';
+  ouvrir();
+  appel('mob_mail', [JETON, id], function(r){
+    var h = r.messages.map(function(m){
+      return '<div class="msg"><div class="meta"><b>' + esc(m.de) + '</b> · ' + esc(m.date) + '</div>' +
+        '<div class="meta">À : ' + esc(m.a) + '</div>' +
+        (m.pjs.length ? '<div>' + m.pjs.map(function(p){
+          return '<button class="pj" onclick="voirPJ(' + p.mi + ',' + p.ai + ')">📎 ' + esc(p.nom) + ' (' + Math.ceil(p.taille/1024) + ' Ko)</button>'; }).join('') + '</div>' : '') +
+        '<pre>' + esc(m.corps) + '</pre></div>';
+    }).join('');
+    h += '<p style="font-size:13px;color:#667085">Besoin de répondre ? <a href="#" onclick="ouvrirGmail();return false">Ouvrir dans Gmail</a> (le mail sera alors marqué comme lu).</p>';
+    document.getElementById('mCorps').innerHTML = h;
+  }, function(m){ document.getElementById('mCorps').innerHTML = '<div class="erreur">' + esc(m) + '</div>'; });
+}
+
+function ouvrirGmail(){
+  var corps = document.getElementById('mCorps');
+  corps.innerHTML = '<p>⚠️ Ouvrir ce mail dans Gmail le marquera comme <b>lu</b>.</p>' +
+    '<a class="btn b-corr" style="display:inline-block;text-decoration:none" target="_blank" href="' + esc(trouver(MAIL_ID)['Lien Gmail']) + '">Ouvrir quand même dans Gmail</a> ' +
+    '<button class="btn b-voir" onclick="voirMail(MAIL_ID)">Annuler</button>';
+}
+
+function voirPJ(mi, ai){
+  var corps = document.getElementById('mCorps');
+  corps.innerHTML = '<button class="btn b-voir" onclick="voirMail(MAIL_ID)">← Retour au mail</button><div id="pjZone" class="chargement">Chargement de la pièce jointe…</div>';
+  appel('mob_pj', [JETON, MAIL_ID, mi, ai], function(p){
+    var zone = document.getElementById('pjZone');
+    zone.className = '';
+    var bin = atob(p.b64);
+    if (/pdf/i.test(p.type) || /\.pdf$/i.test(p.nom)) {
+      var octets = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) octets[i] = bin.charCodeAt(i);
+      afficherPDF(octets, zone);
+    } else if (/^image\//i.test(p.type)) {
+      zone.innerHTML = '<img style="max-width:100%" src="data:' + esc(p.type) + ';base64,' + p.b64 + '">';
+    } else {
+      zone.innerHTML = '<p>Aperçu impossible pour ce type de fichier (' + esc(p.type) + ').</p><a class="btn b-voir" download="' + esc(p.nom) + '" href="data:' + esc(p.type) + ';base64,' + p.b64 + '">Télécharger ' + esc(p.nom) + '</a>';
+    }
+  }, function(m){ document.getElementById('pjZone').innerHTML = '<div class="erreur">' + esc(m) + '</div>'; });
+}
+
+function afficherPDF(octets, zone){
+  if (!window.pdfjsLib) { zone.innerHTML = '<div class="erreur">Lecteur PDF indisponible.</div>'; return; }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  pdfjsLib.getDocument({data: octets}).promise.then(function(doc){
+    zone.innerHTML = '<div class="meta">' + doc.numPages + ' page(s)</div>';
+    var suite = Promise.resolve();
+    for (var n = 1; n <= doc.numPages; n++) (function(n){
+      suite = suite.then(function(){ return doc.getPage(n); }).then(function(page){
+        var vp = page.getViewport({scale: 1.6});
+        var c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+        zone.appendChild(c);
+        return page.render({canvasContext: c.getContext('2d'), viewport: vp}).promise;
+      });
+    })(n);
+  }).catch(function(e){ zone.innerHTML = '<div class="erreur">Lecture du PDF impossible : ' + esc(e.message) + '</div>'; });
+}
+
+/* ---------- Onglet Paiements RJ (tampon) ---------- */
+function chargerTampon(){
+  appel('mob_tampon', [JETON], function(l){
+    if (!l.length) { document.getElementById('tampon').innerHTML = '<div class="vide">Aucune ligne pour l\'instant. Validez des mails « Suivi RJ » dans l\'onglet Boîte mail.</div>'; return; }
+    document.getElementById('tampon').innerHTML = '<table class="rj"><tr><th>Tiers</th><th>Références</th><th>Montant</th><th>Transféré</th></tr>' +
+      l.map(function(r){ return '<tr><td><b>' + esc(r['Tiers']) + '</b><div class="meta">' + esc(r['Antériorité']) + '</div></td><td>' + esc(r['Références']) +
+        '</td><td>' + esc(r['Montant TTC (source)']) + '</td><td>' + esc(r['Transféré au suivi RJ']) + '</td></tr>'; }).join('') + '</table>';
+  });
+}
+
+function ouvrir(){ document.getElementById('modal').style.display = 'block'; }
+function fermer(){ document.getElementById('modal').style.display = 'none'; }
+</script>
+</body>
+</html>
