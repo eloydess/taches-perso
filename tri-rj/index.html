@@ -118,6 +118,29 @@ var EXPLI = {
   'Doublon': "Même pièce qu'un autre mail : une seule ligne suffit.",
   'Sans intérêt': "Publicité, code de connexion ou notification."
 };
+var LIB = {
+  'Suivi RJ': '💶 À payer — nouvelle ligne à ajouter au fichier RJ',
+  'Déjà au suivi RJ': '💶 À payer — déjà dans le fichier RJ',
+  'Créance antérieure': '⛔ Ne pas payer — facture d\'avant le jugement',
+  'À vérifier': '❓ Je ne peux pas trancher — à vérifier par vous',
+  'Action à faire': '✍️ À traiter : répondre, appeler ou signer',
+  'Prestataire à payer': '💶 À payer — prestataire (abonnement, maintenance…)',
+  'Information': 'ℹ️ Rien à faire — simple information',
+  'Doublon': '🔁 Doublon — rien à faire',
+  'Sans intérêt': '🗑️ Sans intérêt — publicité ou notification'
+};
+var FAIRE = {
+  'Suivi RJ': "Cette facture n'est pas encore dans votre fichier RJ. Si vous appuyez sur « D'accord », je la mets dans la liste « Paiements RJ » (onglet en haut) : c'est la liste des virements à faire valider par l'administrateur. Ensuite c'est vous qui faites le virement, puis vous envoyez la preuve avec « Répondre ».",
+  'Déjà au suivi RJ': "Cette facture est déjà dans votre fichier RJ : rien à ajouter. Il reste seulement à faire le virement prévu (si ce n'est pas fait), puis à envoyer la preuve.",
+  'Créance antérieure': "Ne pas payer. Cette facture date d'avant le jugement : elle se déclare au mandataire judiciaire. Vous pouvez répondre au fournisseur avec le texte rapide « Facture antérieure ».",
+  'À vérifier': "Il me manque une information (souvent dans la pièce jointe : date ou montant). Ouvrez « Voir le mail », regardez, puis choisissez la bonne décision avec « Changer / noter ».",
+  'Action à faire': "Il faut répondre ou agir. Utilisez « Répondre » (un texte est parfois déjà prêt).",
+  'Prestataire à payer': "Facture d'un prestataire à régler, hors laboratoires.",
+  'Information': "Rien à faire. Appuyez sur « D'accord » pour la classer.",
+  'Doublon': "Le même document est déjà dans une autre fiche. Appuyez sur « D'accord ».",
+  'Sans intérêt': "Rien à faire. Appuyez sur « D'accord »."
+};
+function lib(d){ return LIB[d] || d; }
 function rang(f){ var r = ORDRE[f['Priorité']]; return r === undefined ? 9 : r; }
 
 try { var j = JSON.parse(localStorage.getItem('triRJ_jeton') || 'null'); if (j && j.exp > Date.now()) JETON = j.v; } catch(e) {}
@@ -203,8 +226,8 @@ function carte(f){
     '<div class="ligne1"><div><span class="badge p-' + esc(f['Priorité']) + '">' + esc(f['Priorité']) + '</span><span class="tiers">' + esc(f['Tiers']) + '</span>' +
       '<div class="meta">' + esc(f['Type']) + ' · reçu le ' + esc(f['Date mail']) + (f['Références'] ? ' · ' + esc(f['Références']) : '') + '</div></div>' +
       '<div class="montant">' + esc(f['Montant TTC']) + '</div></div>' +
-    '<div class="decision">Ma proposition : <b>' + esc(f['Décision proposée']) + '</b>' +
-      (EXPLI[f['Décision proposée']] ? '<div class="meta">' + esc(EXPLI[f['Décision proposée']]) + '</div>' : '') +
+    '<div class="decision">Ma proposition : <b>' + esc(lib(f['Décision proposée'])) + '</b>' +
+      (FAIRE[f['Décision proposée']] ? '<div class="meta">👉 ' + esc(FAIRE[f['Décision proposée']]) + '</div>' : '') +
       '<div class="meta">Étiquette Gmail proposée : ' + esc(f['Étiquette proposée']) + '</div>' + etiq + '</div>' +
     (f['Vérification'] ? '<div class="verif">🔎 <b>Déjà payé ?</b> ' + esc(f['Vérification']) + '</div>' : '') +
     '<div class="note">' + esc(f['Note de Claude']) + '</div>' +
@@ -215,7 +238,7 @@ function carte(f){
     (f['Réponse envoyée'] ? (/^⏰/.test(f['Réponse envoyée'])
         ? '<div class="meta">' + esc(f['Réponse envoyée']) + ' <a href="#" onclick="annulerEnvoi(\'' + id + '\');return false">annuler l\'envoi</a></div>'
         : '<div class="meta">✉️ Réponse : ' + esc(f['Réponse envoyée']) + '</div>') : '') +
-    (traite ? '<div class="statut st-' + esc(f['Statut']) + '">' + esc(f['Statut']) + (f['Décision finale'] ? ' → ' + esc(f['Décision finale']) : '') +
+    (traite ? '<div class="statut st-' + esc(f['Statut']) + '">' + esc(f['Statut']) + (f['Décision finale'] ? ' → ' + esc(lib(f['Décision finale'])) : '') +
       (f['Commentaire Pierre'] ? ' · « ' + esc(f['Commentaire Pierre']) + ' »' : '') + ' (' + esc(f['Date validation']) + ')</div>' : '') +
     '<div class="actions">' +
       '<button class="b-voir" onclick="voirMail(\'' + id + '\')">📄 Voir le mail</button>' +
@@ -252,7 +275,7 @@ function corriger(id){
   document.getElementById('mTitre').textContent = 'Changer la décision ou ajouter une note — ' + f['Tiers'];
   document.getElementById('mCorps').innerHTML =
     '<p class="meta">Choisissez la bonne décision si ma proposition est fausse, et/ou écrivez une note. Rien n\'est envoyé ni modifié dans Gmail.</p><div class="champ"><label>Décision</label><select id="cDec">' + DECISIONS.map(function(d){
-      return '<option' + (d === f['Décision proposée'] ? ' selected' : '') + '>' + esc(d) + '</option>'; }).join('') + '</select></div>' +
+      return '<option value="' + esc(d) + '"' + (d === f['Décision proposée'] ? ' selected' : '') + '>' + esc(lib(d)) + '</option>'; }).join('') + '</select></div>' +
     '<div class="champ"><label>Étiquette Gmail</label><input id="cEtiq" value="' + esc(f['Étiquette proposée']) + '"></div>' +
     '<div class="champ"><label>Votre note (ex. « déjà payé le 08/10 », montant à virer, consigne…)</label><textarea id="cCom" rows="3"></textarea></div>' +
     '<button class="btn b-ok" style="width:100%" onclick="decider(\'' + esc(id) + '\',\'Corrigé\',document.getElementById(\'cDec\').value,document.getElementById(\'cEtiq\').value,document.getElementById(\'cCom\').value)">Enregistrer</button>';
