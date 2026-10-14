@@ -1049,14 +1049,6 @@ function construirePDF(err){
         } catch (e) { echecs.push(titre + ' (' + f.nom + ')'); }
       };
       for (var c of POS.comptes) for (var l of c.lignes) {
-        k++;
-        var pg = doc.addPage([595, 842]);
-        pg.drawText(sansAccents('PHARMACIE GOUIN - Justificatifs de virement - ' + frDate(POS.date)), { x: 50, y: 780, size: 11, font: police });
-        pg.drawText(sansAccents('Virement ' + k + ' - Position bancaire n. ' + c.num + ' (' + NOMS_BANQUE_POS[c.banque] + ')'), { x: 50, y: 740, size: 14, font: gras });
-        pg.drawText(sansAccents(String(l.tiers).toUpperCase()), { x: 50, y: 705, size: 18, font: gras });
-        (sansAccents(l.refs || '').match(/.{1,80}(\s|$)/g) || []).slice(0, 4).forEach(function(t, i){ pg.drawText(t.trim(), { x: 50, y: 680 - i * 16, size: 11, font: police }); });
-        pg.drawText(sansAccents('Montant du virement : ' + eur(l.montant).replace(/\s/g, ' ')), { x: 50, y: 600, size: 14, font: gras });
-        pg.drawText(sansAccents('Pages suivantes : preuve de virement (' + (piecesDe(l, 'preuve').length || 'MANQUANTE') + '), facture (' + (piecesDe(l, 'facture').length || 'MANQUANTE') + ')' + (piecesDe(l, 'document').length ? ', autres documents (' + piecesDe(l, 'document').length + ')' : '') + '.'), { x: 50, y: 570, size: 11, font: police });
         for (var g of ['preuve', 'facture', 'document']) for (var p of piecesDe(l, g)) {
           err.textContent = 'Assemblage du PDF… (' + l.tiers + ')';
           try { await ajouter(await appelP('mob_fichier', [JETON, l.cle, p.id]), intitule(l) + ' - ' + g); } catch (e) { echecs.push(intitule(l) + ' - ' + g + ' (' + e.message + ')'); }
