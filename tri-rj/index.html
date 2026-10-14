@@ -38,6 +38,8 @@
     .lp1{display:flex;align-items:center;gap:4px}
     .lp1 .tiers{font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .lp1 .montant{font-size:13px}
+    .corb{border:0;background:none;cursor:pointer;font-size:15px;padding:2px 4px;opacity:.6;line-height:1}
+    .corb:hover{opacity:1;background:#fde8e8;border-radius:6px}
     .lignePC .meta{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .detail{position:sticky;top:8px;max-height:calc(100vh - 150px);overflow-y:auto}
     .detail .carte{padding:18px 22px;font-size:15px}
@@ -154,7 +156,7 @@
       <button id="oCR" onclick="vue('cr')">📮 Courrier / PDF</button>
     </div>
   </header>
-  <div class="bandeau">Mode test : vos décisions sont enregistrées, Gmail n'est pas modifié et les mails restent dans leur état lu / non lu.</div>
+  <div class="bandeau">Gmail n'est modifié que lorsque vous rangez (🗂) ou supprimez (🗑) un mail, et automatiquement quand un dossier est payé (mail rangé et marqué comme lu). Rien n'est supprimé définitivement.</div>
   <main>
     <section id="vMail">
       <div class="filtres" id="filtres"></div>
@@ -388,7 +390,7 @@ function lignePC(f){
     '<div class="lp1">' + (f['Priorité Pierre'] ? '<span class="badge pp-b">N° ' + esc(f['Priorité Pierre']) + '</span>' : '') +
       '<span class="badge p-' + esc(f['Priorité']) + '">' + esc(f['Priorité']) + '</span>' +
       '<span class="tiers">' + esc(f['Tiers']) + '</span>' + (d.length ? ' <span title="Doublon possible">♊</span>' : '') +
-      '<span class="montant">' + esc(String(f['Montant TTC'] || '').replace(/\s*\[ILLISIBLE\]/, '').replace('(dans la pièce jointe)', '📎 PDF')) + '</span></div>' +
+      '<span class="montant">' + esc(String(f['Montant TTC'] || '').replace(/\s*\[ILLISIBLE\]/, '').replace('(dans la pièce jointe)', '📎 PDF')) + '</span>' + boutonCorbeille(f) + '</div>' +
     '<div class="meta">' + esc(f['Type']) + ' · ' + esc(f['Date mail']) + ' · ' + esc(lib(f['Décision proposée'] || '')).replace(/<[^>]+>/g, '') +
       (f['Statut'] !== 'À valider' ? ' · <b>' + esc(f['Statut']) + '</b>' : '') + '</div></div>';
 }
@@ -419,7 +421,7 @@ function carte(f){
   return '<div class="carte">' +
     '<div class="ligne1"><div>' + (f['Priorité Pierre'] ? '<span class="badge pp-b">N° ' + esc(f['Priorité Pierre']) + '</span>' : '') + '<span class="badge p-' + esc(f['Priorité']) + '">' + esc(f['Priorité']) + '</span><span class="tiers">' + esc(f['Tiers']) + '</span>' +
       '<div class="meta">' + esc(f['Type']) + ' · reçu le ' + esc(f['Date mail']) + (f['Références'] ? ' · ' + esc(f['Références']) : '') + '</div></div>' +
-      '<div class="montant">' + esc(f['Montant TTC']) + '</div></div>' +
+      '<div class="montant">' + esc(f['Montant TTC']) + boutonCorbeille(f) + '</div></div>' +
     '<div class="decision">Ma proposition : <b>' + esc(lib(f['Décision proposée'])) + '</b>' +
       (FAIRE[f['Décision proposée']] ? '<div class="meta">👉 ' + esc(FAIRE[f['Décision proposée']]) + '</div>' : '') +
       '<div class="meta">Étiquette Gmail proposée : ' + esc(f['Étiquette proposée']) + '</div>' + etiq + '</div>' +
@@ -494,6 +496,10 @@ function confirmerRanger(id){
   });
 }
 
+function boutonCorbeille(f){
+  if (/^C-/.test(f['ID']) || /^🗑/.test(f['Date application'] || '')) return '';
+  return '<button class="corb" title="Supprimer ce mail (corbeille, récupérable 30 jours)" onclick="event.stopPropagation();supprimerMail(\'' + esc(f['ID']) + '\')">🗑</button>';
+}
 function supprimerMail(id){
   var f = trouver(id);
   if (!confirm('Mettre ce mail à la corbeille, sans étiquette ?\n« ' + (f['Objet'] || f['Tiers'] || '') + ' »\n\nIl reste récupérable 30 jours dans la Corbeille de Gmail (bouton « ↩ restaurer » sur la fiche).')) return;
