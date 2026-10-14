@@ -405,7 +405,7 @@ document.addEventListener('keydown', function(e){
   else if (k === 'c' && f['Statut'] === 'À valider') corriger(SEL);
   else if (k === 'm') voirMail(SEL);
   else if (k === 'r') repondre(SEL);
-  else if (k === 'g' && !/^C-/.test(SEL) && !f['Date application']) ranger(SEL);
+  else if (k === 'g' && !/^C-/.test(SEL) && (!f['Date application'] || /^↩/.test(f['Date application']))) ranger(SEL);
   else if (/^[123]$/.test(k) && f['Statut'] === 'À valider') priorite(SEL, k);
   else if (k === '/') { var r = document.getElementById('recherche'); if (r) { r.focus(); e.preventDefault(); } }
 });
@@ -430,7 +430,10 @@ function carte(f){
     (f['Incertitudes'] ? '<div class="incert">⚠️ ' + esc(f['Incertitudes']) + '</div>' : '') +
     (!traite && (function(){ var d = doublons(f); return d.length ? '<div class="doublon">♊ <b>Doublon possible</b> — ' + (d.some(function(x){ return x.suivi; }) ? 'déjà compté au suivi RJ, ne pas l\'ajouter une 2e fois' : 'même pièce qu\'une autre fiche : n\'en valider qu\'une') + ' :<br>' +
       d.slice(0, 4).map(function(x){ return '• ' + esc(x.quoi) + ' <span class="meta">(' + esc(x.pourquoi) + ')</span>'; }).join('<br>') + '</div>' : ''; })() || '') +
-    (f['Date application'] ? '<div class="meta">🗂 Rangé dans « ' + esc(f['Étiquette finale']) + ' » le ' + esc(f['Date application']) + ' (sorti de la boîte de réception)</div>' : '') +
+    (f['Date application'] ? (/^↩/.test(f['Date application'])
+        ? '<div class="meta">' + esc(f['Date application']) + '</div>'
+        : '<div class="meta">🗂 Rangé dans « ' + esc(f['Étiquette finale']) + ' » le ' + esc(f['Date application']) + ' (sorti de la boîte de réception) · ' +
+          '<a href="#" onclick="desranger(\'' + id + '\');return false">↩ remettre en boîte de réception</a></div>') : '') +
     (f['Réponse envoyée'] ? (/^⏰/.test(f['Réponse envoyée'])
         ? '<div class="meta">' + esc(f['Réponse envoyée']) + ' <a href="#" onclick="annulerEnvoi(\'' + id + '\');return false">annuler l\'envoi</a></div>'
         : '<div class="meta">✉️ Réponse : ' + esc(f['Réponse envoyée']) + '</div>') : '') +
@@ -442,7 +445,7 @@ function carte(f){
     '<div class="actions">' +
       '<button class="b-voir" onclick="voirMail(\'' + id + '\')">' + (/^C-/.test(f['ID']) ? '📮 Voir le courrier' : '📄 Voir le mail') + '</button>' +
       '<button class="b-voir" onclick="repondre(\'' + id + '\')">✉️ Répondre' + (f['Réponse proposée'] ? ' (texte prêt)' : '') + '</button>' +
-      (/^C-/.test(f['ID']) || f['Date application'] ? '' : '<button class="b-voir" onclick="ranger(\'' + id + '\')">🗂 Ranger</button>') +
+      (/^C-/.test(f['ID']) || (f['Date application'] && !/^↩/.test(f['Date application'])) ? '' : '<button class="b-voir" onclick="ranger(\'' + id + '\')">🗂 Ranger</button>') +
       (traite
         ? '<button class="b-corr" onclick="decider(\'' + id + '\',\'À valider\')">↩︎ Annuler ma décision</button>'
         : '<button class="b-ok" onclick="decider(\'' + id + '\',\'Validé\')">✓ D\'accord</button>' +
@@ -485,6 +488,12 @@ function confirmerRanger(id){
     err.textContent = /403|insufficient|scope|autoris/i.test(m) ? 'Le rangement n\'est pas encore autorisé par Google (autorisation à accepter dans l\'éditeur Apps Script).' : m;
     b.disabled = false; b.textContent = '🗂 Réessayer';
   });
+}
+
+function desranger(id){
+  var f = trouver(id);
+  if (!confirm('Remettre ce mail dans la boîte de réception ?\nL\'étiquette « ' + (f['Étiquette finale'] || '') + ' » sera retirée ; son statut lu / non lu ne change pas. Il ne sera plus rangé automatiquement.')) return;
+  appel('mob_desranger', [JETON, id], function(r){ f['Date application'] = r.note; afficher(); }, function(m){ alert('Non effectué : ' + m); });
 }
 
 function priorite(id, n){
@@ -862,6 +871,7 @@ function afficherTreso(){
       '</div></div></div>';
   }).join('');
   h += blocLivraison();
+  h += '<details class="carte" id="clotRec" ontoggle="if(this.open)chargerClotures()"><summary><b>↩ Clôturés récemment</b> <span class="meta">— rouvrir un dossier clôturé ou archivé par erreur</span></summary><div id="clotListe" class="meta">Chargement…</div></details>';
   if (TRESO.clotures) h += '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="archiver()">📦 Ranger ' + TRESO.clotures + ' dossier(s) clôturé(s) dans les archives</button>';
   h += '<p class="meta">Source : ' + esc(TRESO.source) + '. Mis à jour : ' + esc(TRESO.maj) + '.</p></div>';
   document.getElementById('treso').innerHTML = h;
@@ -1355,6 +1365,32 @@ function blocLivraison(){
         '<button class="pj" onclick="livrer(' + k + ',\'⚪ Sans livraison attendue\')">⚪ Sans livraison</button>' +
         (x.lien ? '<button class="pj" onclick="window.open(\'' + esc(x.lien) + '\',\'_blank\')">📧 Mail d\'origine</button>' : '') + '</div></div>';
     }).join('');
+}
+var CLOT = [];
+function chargerClotures(){
+  var z = document.getElementById('clotListe'); if (!z) return;
+  z.innerHTML = 'Chargement…';
+  appel('mob_clotures', [JETON], function(l){
+    CLOT = l || [];
+    z.className = '';
+    z.innerHTML = CLOT.length ? CLOT.map(function(x, k){
+      return '<div style="border-top:1px solid var(--bord);padding:8px 0"><div class="ligne1"><span class="tiers">' + esc(x.tiers) + '</span><span class="montant">' + (x.montant != null ? eur(x.montant) : '') + '</span></div>' +
+        '<div class="meta">' + esc(x.refs) + '</div>' +
+        '<div class="meta">' + (x.preuve ? '📨 preuve envoyée le ' + esc(x.preuve) : 'clôturé') + ' · ' + esc(x.livraison || 'livraison non renseignée') + (x.ou === 'archives' ? ' · 📦 archivé le ' + esc(x.archive) : '') + '</div>' +
+        '<div class="opts" id="clo' + k + '"><button class="pj" onclick="rouvrir(' + k + ',\'livraison\')">↩ Pas encore livré</button>' +
+        '<button class="pj" onclick="rouvrir(' + k + ',\'paiement\')">↩ Rouvrir le paiement</button></div></div>';
+    }).join('') : 'Aucun dossier clôturé récemment.';
+  }, function(m){ z.innerHTML = '<span class="neg">' + esc(m) + '</span>'; });
+}
+function rouvrir(k, mode){
+  var x = CLOT[k];
+  var quoi = mode === 'livraison'
+    ? 'Remettre « ' + x.tiers + ' » en attente de livraison ?\nLe dossier reste payé et réapparaît dans « 📦 Payés — livraison à confirmer ».'
+    : 'Rouvrir le paiement de « ' + x.tiers + ' » ?\nLa date de renvoi de la preuve est effacée : le dossier revient dans la liste des paiements.';
+  if (!confirm(quoi + (x.ou === 'archives' ? '\n\nIl sera d\'abord ressorti des archives.' : ''))) return;
+  var z = document.getElementById('clo' + k); z.innerHTML = '<span class="meta">Enregistrement…</span>';
+  appel('mob_rouvrir', [JETON, x.ou, x.cle, x.ligne || 0, mode], function(){ chargerTreso(); },
+    function(m){ z.innerHTML = '<span class="neg">' + esc(m) + '</span>'; });
 }
 function livrer(k, valeur){
   var x = TRESO.attenteLivraison[k], z = document.getElementById('lv' + k);
