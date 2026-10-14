@@ -238,6 +238,17 @@ function pc_factureAuto_(d) {
  */
 function mob_facturesAuto(jeton, cle) {
   mob_verifier_(jeton);
+  return pc_facturesAuto_(cle);
+}
+
+/** À lancer depuis l'éditeur (bouton Exécuter) : range la facture de tous les dossiers en cours qui n'en ont pas. */
+function rechercherFacturesManquantes() {
+  var r = pc_facturesAuto_();
+  Logger.log('Factures retrouvées (' + r.trouvees.length + ') :\n' + r.trouvees.join('\n') + '\n\nSans facture (' + r.sansFacture.length + ') :\n' + r.sansFacture.join('\n'));
+  return r;
+}
+
+function pc_facturesAuto_(cle) {
   var debut = Date.now();
   var verrou = LockService.getScriptLock();
   verrou.waitLock(30000);
