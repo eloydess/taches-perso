@@ -126,6 +126,7 @@
 .doublon{margin:8px 0;padding:8px 10px;border-radius:8px;background:#fdecea;color:#8a1c12;font-size:13px;line-height:1.45}
 .tpos{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
 .tpos th,.tpos td{border-bottom:1px solid var(--bord);padding:6px 4px;text-align:left;vertical-align:top}
+.lienfic{color:var(--bleu);text-decoration:underline;cursor:pointer;font-size:12px}
 </style>
 </head>
 <body>
@@ -794,8 +795,10 @@ function lsGet(k, d){ try { var v = localStorage.getItem(k); return v == null ? 
 function lsSet(k, v){ try { localStorage.setItem(k, v); } catch(e) {} }
 function aujISO(){ var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
 function frDate(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] : iso; }
-function positionAdmin(){
-  var choisis = TRESO.lignes.filter(function(x){ return x.choisi && x.montantVir > 0; });
+function positionAdmin(cles){
+  var choisis = cles ? TRESO.lignes.filter(function(x){ return cles.indexOf(x.cle) >= 0; }).map(function(x){
+      return Object.assign({}, x, { montantVir: x.montantVir || (x.versements && x.versements.length ? x.versements[x.versements.length - 1].montant : null) || x.montantTTC || x.du, banqueVir: x.banqueVir || 'CEBPL' }); })
+    : TRESO.lignes.filter(function(x){ return x.choisi && x.montantVir > 0; });
   if (!choisis.length) { alert('Cochez d\'abord les factures à virer.'); return; }
   var banques = ['CEBPL', 'BPGO'].filter(function(b){ return choisis.some(function(x){ return (x.banqueVir || 'CEBPL') === b; }); });
   var num = Number(lsGet('triRJ_posNum', '1')) + 1;
@@ -803,10 +806,11 @@ function positionAdmin(){
     var s = TRESO.soldes[b];
     return { banque: b, num: num + i, solde: s && s.montant != null ? s.montant : null,
       lignes: choisis.filter(function(x){ return (x.banqueVir || 'CEBPL') === b; }).map(function(x){
-        return { cle: x.cle, tiers: x.tiers, refs: x.refs, montant: x.montantVir, lien: x.lien, preuves: x.preuves || 0 }; }) };
+        return { cle: x.cle, tiers: x.tiers, refs: x.refs, montant: x.montantVir, lien: x.lien, preuves: x.preuves || 0, preuve: [], fact: { etat: 'à chercher', fichiers: [] } }; }) };
   }) };
   dessinerPosition();
   ouvrir();
+  chercherFactures();
 }
 function totalCompte(c){ return Math.round(c.lignes.reduce(function(s, l){ return s + l.montant; }, 0) * 100) / 100; }
 function intitule(l){ return (String(l.tiers).toUpperCase() + (l.refs ? ' — ' + l.refs : '')).replace(/\s+/g, ' ').slice(0, 70); }
@@ -839,23 +843,155 @@ function dessinerPosition(){
       '<div class="opts"><label class="meta">N° de position <input style="width:70px" inputmode="numeric" value="' + c.num + '" onchange="POS.comptes[' + ci + '].num=Number(this.value)||1;dessinerPosition()"></label>' +
       '<label class="meta">Solde avant virements <input style="width:120px" inputmode="decimal" value="' + (c.solde == null ? '' : String(c.solde).replace('.', ',')) + '" onchange="POS.comptes[' + ci + '].solde=nb(this.value);dessinerPosition()"></label></div>' +
       '<table class="tpos"><tr><th>Virement</th><th>Montant</th><th>Pièces à joindre</th></tr>' +
-      c.lignes.map(function(l){
+      c.lignes.map(function(l, li){
         return '<tr><td>' + esc(intitule(l)) + '</td><td style="text-align:right;white-space:nowrap">' + eur(l.montant) + '</td><td class="meta">' +
-          '☐ ordre de virement' + (l.preuves ? ' (déjà joint au dossier)' : '') + '<br>☐ facture' + (l.lien ? ' · <a href="' + esc(l.lien) + '" target="_blank">📧 mail d\'origine</a>' : ' (ou motif)') + '</td></tr>';
+          celluleFacture(l, ci, li) + '<br>' + cellulePreuve(l, ci, li) + '</td></tr>';
       }).join('') +
       '<tr><td><b>Total</b></td><td style="text-align:right"><b>' + eur(tot) + '</b></td><td class="meta">' + (c.solde != null ? 'solde après : <b class="' + (c.solde - tot < 0 ? 'neg' : 'pos') + '">' + eur(c.solde - tot) + '</b>' : 'solde non saisi') + '</td></tr></table></div>';
   });
   h += '<button class="btn b-voir" style="width:100%" onclick="telechargerPositions()">⬇️ 1. Télécharger ' + (POS.comptes.length > 1 ? 'les positions bancaires' : 'la position bancaire') + ' (Excel, modèle de l\'administrateur)</button>' +
+    '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="dossierPDF()">⬇️ 2. Télécharger les justificatifs en un seul PDF (preuve + facture de chaque virement)</button>' +
     '<div class="champ" style="margin-top:10px"><label>À</label><input id="pA" value="' + esc(POS.a) + '" onchange="POS.a=this.value;lsSet(\'triRJ_adminA\',this.value)"></div>' +
     '<div class="champ"><label>Copie</label><input id="pCc" value="' + esc(POS.cc) + '" onchange="POS.cc=this.value;lsSet(\'triRJ_adminCc\',this.value)"></div>' +
-    '<div class="champ"><label>Objet</label><input id="pO" value="' + esc(objetMailAdmin()) + '"></div>' +
-    '<div class="champ"><label>Message (modifiable)</label><textarea id="pT" rows="14">' + esc(texteMailAdmin()) + '</textarea></div>' +
-    '<button class="btn b-ok" style="width:100%" onclick="ouvrirGmailAdmin()">✉️ 2. Ouvrir le mail dans Gmail</button>' +
-    '<p class="meta">Dans Gmail, joignez avec le trombone 📎 : le fichier Excel téléchargé, les ordres de virement (captures ou PDF de l\'application de la banque) et les factures, puis envoyez.</p>' +
+    '<div class="champ"><label>Objet</label><input id="pO" value="' + esc(POS.objet || objetMailAdmin()) + '" oninput="POS.objet=this.value"></div>' +
+    '<div class="champ"><label>Message (modifiable)</label><textarea id="pT" rows="14" oninput="POS.texte=this.value">' + esc(POS.texte || texteMailAdmin()) + '</textarea></div>' +
+    '<button class="btn b-ok" style="width:100%" onclick="ouvrirGmailAdmin()">✉️ 3. Ouvrir le mail dans Gmail</button>' +
+    '<p class="meta">Dans Gmail, joignez avec le trombone 📎 les 2 fichiers téléchargés (dans « Téléchargements ») : la position bancaire (Excel) et le PDF des justificatifs. Puis envoyez.</p>' +
     '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="copierMailAdmin()">📋 Copier le texte du mail</button>' +
-    '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="noterDemande()">✅ 3. Mail envoyé : noter la demande de virement sur les dossiers</button>' +
+    '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="noterDemande()">✅ 4. Mail envoyé : noter la demande de virement sur les dossiers</button>' +
     '<div id="pErr" class="erreur"></div>';
   document.getElementById('mCorps').innerHTML = h;
+}
+function celluleFacture(l, ci, li){
+  var f = l.fact;
+  var etat = f.etat === 'trouvée' ? '✅ facture : ' + f.fichiers.map(function(x){ return esc(x.nom); }).join(', ')
+    : f.etat === 'recherche' ? '⏳ recherche de la facture…'
+    : '⚠️ facture ' + esc(f.etat);
+  return etat + ' <label class="lienfic">' + (f.etat === 'trouvée' ? 'remplacer' : 'choisir le fichier') +
+    '<input type="file" accept="application/pdf,image/*" multiple style="display:none" onchange="fichiersLigne(this,' + ci + ',' + li + ',\'fact\')"></label>';
+}
+function cellulePreuve(l, ci, li){
+  return (l.preuve.length ? '✅ ordre de virement : ' + l.preuve.map(function(x){ return esc(x.nom); }).join(', ') : '☐ ordre de virement (capture ou PDF de la banque)') +
+    ' <label class="lienfic">' + (l.preuve.length ? 'remplacer' : 'choisir') +
+    '<input type="file" accept="application/pdf,image/*" multiple style="display:none" onchange="fichiersLigne(this,' + ci + ',' + li + ',\'preuve\')"></label>' +
+    (l.preuves && !l.preuve.length ? '<div class="meta">(une preuve est déjà rangée dans le dossier, mais l\'application ne peut pas la relire : choisissez le fichier sur cet appareil)</div>' : '');
+}
+function lireFichiers(liste, fin){
+  var res = [], tous = Array.prototype.slice.call(liste);
+  var suite = function(){
+    if (!tous.length) return fin(res);
+    var f = tous.shift();
+    if (/pdf/i.test(f.type) || /\.pdf$/i.test(f.name)) { var r = new FileReader(); r.onload = function(){ res.push({ nom: f.name, type: 'application/pdf', b64: String(r.result).split(',')[1] }); suite(); }; r.readAsDataURL(f); }
+    else if (/^image\//.test(f.type)) reduireImage(f, function(p){ res.push({ nom: f.name, type: p.type, b64: p.b64 }); suite(); });
+    else suite();
+  };
+  suite();
+}
+function fichiersLigne(input, ci, li, quoi){
+  var l = POS.comptes[ci].lignes[li];
+  lireFichiers(input.files || [], function(fs){
+    if (!fs.length) return;
+    if (quoi === 'preuve') l.preuve = fs; else l.fact = { etat: 'trouvée', fichiers: fs };
+    dessinerPosition();
+  });
+}
+/* La facture est retrouvée dans le mail (ou le courrier scanné) d'où vient le dossier. */
+function idSource(l){
+  var u = String(l.lien || ''), m = /thread-f:(\d+)/.exec(u);
+  if (m && window.BigInt) return BigInt(m[1]).toString(16);
+  m = /#[a-z]+\/([0-9a-f]{16})\b/.exec(u); if (m) return m[1];
+  var f = (FICHES || []).filter(function(g){ return g['Références'] && g['Références'] === l.refs; })[0];
+  return f ? f['ID'] : '';
+}
+function chercherFactures(){
+  var a_faire = [];
+  POS.comptes.forEach(function(c){ c.lignes.forEach(function(l){ if (l.fact.etat === 'à chercher') a_faire.push(l); }); });
+  var suite = function(){
+    if (!a_faire.length) return;
+    var l = a_faire.shift(), id = idSource(l);
+    var fini = function(etat, fichiers){ l.fact = { etat: etat, fichiers: fichiers || [] }; if (POS) dessinerPosition(); suite(); };
+    if (!id) return fini('introuvable automatiquement : choisissez le fichier');
+    l.fact.etat = 'recherche'; dessinerPosition();
+    if (/^C-/.test(id)) {
+      var pages = [], p = 0;
+      var page = function(){
+        appel('mob_scan', [JETON, id, p], function(r){ pages.push({ nom: 'courrier p' + (p + 1) + (/pdf/i.test(r.type) ? '.pdf' : '.jpg'), type: r.type, b64: r.b64 }); p++; if (p < r.pages && p < 12) page(); else fini('trouvée', pages); },
+          function(){ fini(pages.length ? 'trouvée' : 'introuvable : choisissez le fichier', pages); });
+      };
+      return page();
+    }
+    appel('mob_mail', [JETON, id], function(r){
+      var pjs = [];
+      r.messages.forEach(function(m){ m.pjs.forEach(function(p){
+        if ((/pdf/i.test(p.type) || /\.pdf$/i.test(p.nom)) && !/preuve|virement|rib|cgv|courrier.?proforma.?groupe/i.test(p.nom)) pjs.push(p);
+      }); });
+      if (!pjs.length) return fini('absente du mail : choisissez le fichier');
+      pjs = pjs.slice(-3);
+      var res = [];
+      var une = function(){
+        if (!pjs.length) return fini(res.length ? 'trouvée' : 'illisible : choisissez le fichier', res);
+        var p = pjs.shift();
+        appel('mob_pj', [JETON, id, p.mi, p.ai], function(f){ res.push({ nom: f.nom, type: f.type, b64: f.b64 }); une(); }, function(){ une(); });
+      };
+      une();
+    }, function(){ fini('introuvable : choisissez le fichier'); });
+  };
+  suite();
+}
+function chargerPdfLib(fin){
+  if (window.PDFLib) return fin();
+  var sc = document.createElement('script');
+  sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
+  sc.onload = fin; sc.onerror = function(){ document.getElementById('pErr').textContent = 'Impossible de charger l\'outil PDF (réseau). Réessayez.'; };
+  document.head.appendChild(sc);
+}
+function octetsB64(b64){ var bin = atob(b64), o = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i); return o; }
+function sansAccents(t){ return String(t).replace(/€/g, 'EUR').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7E]/g, ' '); }
+function dossierPDF(){
+  var err = document.getElementById('pErr'); err.textContent = '';
+  var manque = [];
+  POS.comptes.forEach(function(c){ c.lignes.forEach(function(l){
+    if (!l.preuve.length) manque.push(intitule(l) + ' : ordre de virement');
+    if (l.fact.etat !== 'trouvée') manque.push(intitule(l) + ' : facture');
+  }); });
+  if (manque.length && !confirm('Il manque :\n- ' + manque.join('\n- ') + '\n\nCréer le PDF quand même ?')) return;
+  err.textContent = 'Assemblage du PDF…';
+  chargerPdfLib(function(){
+    (async function(){
+      var P = PDFLib, doc = await P.PDFDocument.create(), police = await doc.embedFont(P.StandardFonts.Helvetica), gras = await doc.embedFont(P.StandardFonts.HelveticaBold);
+      var echecs = [], k = 0;
+      var ajouter = async function(f, titre){
+        try {
+          if (/pdf/i.test(f.type)) {
+            var src = await P.PDFDocument.load(octetsB64(f.b64), { ignoreEncryption: true });
+            (await doc.copyPages(src, src.getPageIndices())).forEach(function(pg){ doc.addPage(pg); });
+          } else {
+            var img = /png/i.test(f.type) ? await doc.embedPng(octetsB64(f.b64)) : await doc.embedJpg(octetsB64(f.b64));
+            var W = 595, H = 842, r = Math.min((W - 40) / img.width, (H - 40) / img.height, 1);
+            var pg = doc.addPage([W, H]); pg.drawImage(img, { x: (W - img.width * r) / 2, y: (H - img.height * r) / 2, width: img.width * r, height: img.height * r });
+          }
+        } catch (e) { echecs.push(titre + ' (' + f.nom + ')'); }
+      };
+      for (var c of POS.comptes) for (var l of c.lignes) {
+        k++;
+        var pg = doc.addPage([595, 842]);
+        pg.drawText(sansAccents('PHARMACIE GOUIN - Justificatifs de virement - ' + frDate(POS.date)), { x: 50, y: 780, size: 11, font: police });
+        pg.drawText(sansAccents('Virement ' + k + ' - Position bancaire n. ' + c.num + ' (' + NOMS_BANQUE_POS[c.banque] + ')'), { x: 50, y: 740, size: 14, font: gras });
+        pg.drawText(sansAccents(String(l.tiers).toUpperCase()), { x: 50, y: 705, size: 18, font: gras });
+        (sansAccents(l.refs || '').match(/.{1,80}(\s|$)/g) || []).slice(0, 4).forEach(function(t, i){ pg.drawText(t.trim(), { x: 50, y: 680 - i * 16, size: 11, font: police }); });
+        pg.drawText(sansAccents('Montant du virement : ' + eur(l.montant).replace(/\s/g, ' ')), { x: 50, y: 600, size: 14, font: gras });
+        pg.drawText(sansAccents('Pages suivantes : ordre de virement (' + (l.preuve.length || 'MANQUANT') + '), puis facture (' + (l.fact.etat === 'trouvée' ? l.fact.fichiers.length : 'MANQUANTE') + ').'), { x: 50, y: 570, size: 11, font: police });
+        for (var f of l.preuve) await ajouter(f, intitule(l) + ' - ordre de virement');
+        if (l.fact.etat === 'trouvée') for (var g of l.fact.fichiers) await ajouter(g, intitule(l) + ' - facture');
+      }
+      var octets = await doc.save();
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([octets], { type: 'application/pdf' }));
+      a.download = 'Justificatifs_virements_' + frDate(POS.date).replace(/\//g, '.') + '_position_' + POS.comptes.map(function(c){ return c.num; }).join('-') + '.pdf';
+      document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+      err.innerHTML = echecs.length ? 'PDF créé, mais ces fichiers n\'ont pas pu y être mis (à joindre séparément dans Gmail) : ' + esc(echecs.join(' ; ')) : '<span class="pos">✓ PDF des justificatifs téléchargé (' + doc.getPageCount() + ' pages).</span>';
+    })().catch(function(e){ err.textContent = 'PDF non créé : ' + e.message; });
+  });
 }
 function chargerExcelJS(fin){
   if (window.ExcelJS) return fin();
@@ -1000,7 +1136,8 @@ function blocPreuve(x){
     '<label class="btn b-voir" style="display:block;text-align:center;margin-top:8px;cursor:pointer">📎 Joindre la preuve (PDF ou photo)<input type="file" accept="application/pdf,image/*" style="display:none" onchange="joindrePreuve(this)"></label>' +
     '<div id="pErr" class="erreur"></div>' +
     '<div class="opts"><button class="btn b-ok" style="flex:1" onclick="preparerEnvoi(\'preuve\')"' + (x.preuves ? '' : ' disabled') + '>📨 Envoyer la preuve</button>' +
-    '<button class="btn b-corr" style="flex:1" onclick="preparerEnvoi(\'relance\')">🔔 Relancer (non reçu)</button></div></div>';
+    '<button class="btn b-corr" style="flex:1" onclick="preparerEnvoi(\'relance\')">🔔 Relancer (non reçu)</button></div>' +
+    '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="positionAdmin([TRESO.lignes[DOSSIER].cle])">🏛 Pour l\'administrateur : position bancaire + preuve + facture</button></div>';
 }
 function joindrePreuve(input){
   var f = input.files && input.files[0]; input.value = ''; if (!f) return;
