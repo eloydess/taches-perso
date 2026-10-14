@@ -124,6 +124,8 @@
 .zonecolle{margin-top:8px;padding:14px;border:2px dashed #9aa5b1;border-radius:10px;text-align:center;color:#5f6b7a;font-size:14px;min-height:22px;outline:none;-webkit-user-select:text;user-select:text}
 .zonecolle:focus{border-color:#1a73e8;color:#1a73e8}
 .doublon{margin:8px 0;padding:8px 10px;border-radius:8px;background:#fdecea;color:#8a1c12;font-size:13px;line-height:1.45}
+.tpos{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+.tpos th,.tpos td{border-bottom:1px solid var(--bord);padding:6px 4px;text-align:left;vertical-align:top}
 </style>
 </head>
 <body>
@@ -756,7 +758,7 @@ function afficherTreso(){
     (t.sansMontant ? '<span class="meta" style="grid-column:1/3">+ ' + t.sansMontant + ' sans montant connu (en attente de facture)</span>' : '') +
     '<span>✅ Je vire maintenant (' + t.nVir + ')</span><b class="pos">' + eur(t.vir) + '</b>' +
     '<span>Reste dû après ces virements</span><b>' + eur(t.du - t.vir) + '</b>' +
-    '</div><p class="meta" style="margin-bottom:0">Cochez les factures que vous voulez virer maintenant ; vous pouvez changer le montant (virement partiel) et la banque. Rien n\'est viré par l\'application.</p></div>' +
+    '</div>' + (t.nVir ? '<button class="btn b-ok" style="width:100%;margin-top:10px" onclick="positionAdmin()">📄 Position bancaire + mail à l\'administrateur</button>' : '') + '<p class="meta" style="margin-bottom:0">Cochez les factures que vous voulez virer maintenant ; vous pouvez changer le montant (virement partiel) et la banque. Rien n\'est viré par l\'application.</p></div>' +
     (ECRAN_PC ? '<p class="meta raccourcis">Astuce : cochez les factures à droite ; le total se met à jour ici.</p>' : '') + '</div><div class="rjListe">';
   var ordre = { '1': 0, '2': 1, '3': 2, '': 3 };
   var l = TRESO.lignes.slice().sort(function(a, b){ return (b.choisi - a.choisi) || (ordre[a.priorite] - ordre[b.priorite]) || ((b.du || 0) - (a.du || 0)); });
@@ -780,6 +782,151 @@ function afficherTreso(){
   if (TRESO.clotures) h += '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="archiver()">📦 Ranger ' + TRESO.clotures + ' dossier(s) clôturé(s) dans les archives</button>';
   h += '<p class="meta">Source : ' + esc(TRESO.source) + '. Mis à jour : ' + esc(TRESO.maj) + '.</p></div>';
   document.getElementById('treso').innerHTML = h;
+}
+
+
+/* ---------- Position bancaire + mail à l'administrateur (après saisie des virements dans l'application de la banque) ---------- */
+var MODELE_POSITION = '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';
+var ADMIN = { a: 'c.beaussart@trajectoire.eu', cc: 'lemans@trajectoire.eu' };
+var NOMS_BANQUE_POS = { CEBPL: "CAISSE D'EPARGNE", BPGO: 'BPGO' };
+var POS = null;
+function lsGet(k, d){ try { var v = localStorage.getItem(k); return v == null ? d : v; } catch(e) { return d; } }
+function lsSet(k, v){ try { localStorage.setItem(k, v); } catch(e) {} }
+function aujISO(){ var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function frDate(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] : iso; }
+function positionAdmin(){
+  var choisis = TRESO.lignes.filter(function(x){ return x.choisi && x.montantVir > 0; });
+  if (!choisis.length) { alert('Cochez d\'abord les factures à virer.'); return; }
+  var banques = ['CEBPL', 'BPGO'].filter(function(b){ return choisis.some(function(x){ return (x.banqueVir || 'CEBPL') === b; }); });
+  var num = Number(lsGet('triRJ_posNum', '1')) + 1;
+  POS = { date: aujISO(), a: lsGet('triRJ_adminA', ADMIN.a), cc: lsGet('triRJ_adminCc', ADMIN.cc), comptes: banques.map(function(b, i){
+    var s = TRESO.soldes[b];
+    return { banque: b, num: num + i, solde: s && s.montant != null ? s.montant : null,
+      lignes: choisis.filter(function(x){ return (x.banqueVir || 'CEBPL') === b; }).map(function(x){
+        return { cle: x.cle, tiers: x.tiers, refs: x.refs, montant: x.montantVir, lien: x.lien, preuves: x.preuves || 0 }; }) };
+  }) };
+  dessinerPosition();
+  ouvrir();
+}
+function totalCompte(c){ return Math.round(c.lignes.reduce(function(s, l){ return s + l.montant; }, 0) * 100) / 100; }
+function intitule(l){ return (String(l.tiers).toUpperCase() + (l.refs ? ' — ' + l.refs : '')).replace(/\s+/g, ' ').slice(0, 70); }
+function texteMailAdmin(){
+  var morceaux = POS.comptes.map(function(c){
+    var tot = totalCompte(c);
+    return 'Position bancaire n° ' + c.num + ' — compte ' + NOMS_BANQUE[c.banque] + ' :\n' +
+      c.lignes.map(function(l){ return '- ' + intitule(l) + ' : ' + eur(l.montant); }).join('\n') +
+      '\nTotal des virements : ' + eur(tot) +
+      (c.solde != null ? '\nSolde avant virements : ' + eur(c.solde) + ' ; solde après virements : ' + eur(c.solde - tot) : '');
+  });
+  return 'Bonjour Maître,\n\n' +
+    'Veuillez trouver ci-joint ' + (POS.comptes.length > 1 ? 'les positions bancaires' : 'la position bancaire') + ' du ' + frDate(POS.date) +
+    ', accompagnée' + (POS.comptes.length > 1 ? 's' : '') + ', pour chaque virement, de l\'ordre de virement saisi dans l\'application de la banque et de la facture correspondante (ou du motif du règlement), afin que vous puissiez valider ces virements.\n\n' +
+    morceaux.join('\n\n') + '\n\n' +
+    'Il s\'agit de dépenses postérieures au jugement d\'ouverture du 30 juin 2026.\n\n' +
+    'Je reste à votre disposition pour tout complément d\'information.\n\n' +
+    'Bien cordialement,\n\nPierre GOUIN\nGrande Pharmacie du Centre Sud — SELARL Pharmacie Gouin\n309 avenue Georges Durand, 72100 Le Mans\n02 43 72 45 01';
+}
+function objetMailAdmin(){
+  return 'PHARMACIE GOUIN — Position bancaire n° ' + POS.comptes.map(function(c){ return c.num; }).join(' et ') + ' du ' + frDate(POS.date) + ' — validation des virements';
+}
+function dessinerPosition(){
+  document.getElementById('mTitre').textContent = 'Position bancaire pour l\'administrateur';
+  var h = '<p class="meta">À faire <b>après</b> avoir saisi les virements dans l\'application de la banque. Rien n\'est envoyé automatiquement.</p>' +
+    '<div class="champ"><label>Date de la position</label><input type="date" value="' + POS.date + '" onchange="POS.date=this.value;dessinerPosition()"></div>';
+  POS.comptes.forEach(function(c, ci){
+    var tot = totalCompte(c);
+    h += '<div class="carte"><b>🏦 ' + esc(NOMS_BANQUE[c.banque]) + '</b>' +
+      '<div class="opts"><label class="meta">N° de position <input style="width:70px" inputmode="numeric" value="' + c.num + '" onchange="POS.comptes[' + ci + '].num=Number(this.value)||1;dessinerPosition()"></label>' +
+      '<label class="meta">Solde avant virements <input style="width:120px" inputmode="decimal" value="' + (c.solde == null ? '' : String(c.solde).replace('.', ',')) + '" onchange="POS.comptes[' + ci + '].solde=nb(this.value);dessinerPosition()"></label></div>' +
+      '<table class="tpos"><tr><th>Virement</th><th>Montant</th><th>Pièces à joindre</th></tr>' +
+      c.lignes.map(function(l){
+        return '<tr><td>' + esc(intitule(l)) + '</td><td style="text-align:right;white-space:nowrap">' + eur(l.montant) + '</td><td class="meta">' +
+          '☐ ordre de virement' + (l.preuves ? ' (déjà joint au dossier)' : '') + '<br>☐ facture' + (l.lien ? ' · <a href="' + esc(l.lien) + '" target="_blank">📧 mail d\'origine</a>' : ' (ou motif)') + '</td></tr>';
+      }).join('') +
+      '<tr><td><b>Total</b></td><td style="text-align:right"><b>' + eur(tot) + '</b></td><td class="meta">' + (c.solde != null ? 'solde après : <b class="' + (c.solde - tot < 0 ? 'neg' : 'pos') + '">' + eur(c.solde - tot) + '</b>' : 'solde non saisi') + '</td></tr></table></div>';
+  });
+  h += '<button class="btn b-voir" style="width:100%" onclick="telechargerPositions()">⬇️ 1. Télécharger ' + (POS.comptes.length > 1 ? 'les positions bancaires' : 'la position bancaire') + ' (Excel, modèle de l\'administrateur)</button>' +
+    '<div class="champ" style="margin-top:10px"><label>À</label><input id="pA" value="' + esc(POS.a) + '" onchange="POS.a=this.value;lsSet(\'triRJ_adminA\',this.value)"></div>' +
+    '<div class="champ"><label>Copie</label><input id="pCc" value="' + esc(POS.cc) + '" onchange="POS.cc=this.value;lsSet(\'triRJ_adminCc\',this.value)"></div>' +
+    '<div class="champ"><label>Objet</label><input id="pO" value="' + esc(objetMailAdmin()) + '"></div>' +
+    '<div class="champ"><label>Message (modifiable)</label><textarea id="pT" rows="14">' + esc(texteMailAdmin()) + '</textarea></div>' +
+    '<button class="btn b-ok" style="width:100%" onclick="ouvrirGmailAdmin()">✉️ 2. Ouvrir le mail dans Gmail</button>' +
+    '<p class="meta">Dans Gmail, joignez avec le trombone 📎 : le fichier Excel téléchargé, les ordres de virement (captures ou PDF de l\'application de la banque) et les factures, puis envoyez.</p>' +
+    '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="copierMailAdmin()">📋 Copier le texte du mail</button>' +
+    '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="noterDemande()">✅ 3. Mail envoyé : noter la demande de virement sur les dossiers</button>' +
+    '<div id="pErr" class="erreur"></div>';
+  document.getElementById('mCorps').innerHTML = h;
+}
+function chargerExcelJS(fin){
+  if (window.ExcelJS) return fin();
+  var sc = document.createElement('script');
+  sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+  sc.onload = fin; sc.onerror = function(){ document.getElementById('pErr').textContent = 'Impossible de charger l\'outil Excel (réseau). Réessayez.'; };
+  document.head.appendChild(sc);
+}
+function remplirPosition(c){
+  var bin = atob(MODELE_POSITION), o = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i);
+  var wb = new ExcelJS.Workbook();
+  return wb.xlsx.load(o.buffer).then(function(){
+    var ws = wb.worksheets[0];
+    ws.getCell('G1').value = c.num;
+    ws.getCell('C4').value = NOMS_BANQUE_POS[c.banque];
+    ws.getCell('B8').value = 'Solde ' + NOMS_BANQUE_POS[c.banque];
+    ws.getCell('G8').value = c.solde == null ? null : c.solde;
+    for (var r = 9; r <= 31; r++) { ['A', 'B', 'E', 'F'].forEach(function(col){ ws.getCell(col + r).value = null; }); ws.getCell('G' + r).value = { formula: 'G' + (r - 1) + '+E' + r + '-F' + r }; }
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(POS.date);
+    var d = m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : new Date();
+    c.lignes.slice(0, 23).forEach(function(l, k){
+      var r = 9 + k;
+      ws.getCell('A' + r).value = d; ws.getCell('A' + r).numFmt = 'dd/mm/yyyy';
+      ws.getCell('B' + r).value = intitule(l);
+      ws.getCell('F' + r).value = l.montant;
+    });
+    ws.getCell('C41').value = frDate(POS.date);
+    return wb.xlsx.writeBuffer();
+  });
+}
+function telechargerPositions(){
+  var err = document.getElementById('pErr'); err.textContent = '';
+  if (POS.comptes.some(function(c){ return c.lignes.length > 23; })) { err.textContent = 'Plus de 23 virements sur un compte : le modèle n\'a que 23 lignes. Faites deux envois.'; return; }
+  chargerExcelJS(function(){
+    var suite = function(i){
+      if (i >= POS.comptes.length) { err.innerHTML = '<span class="pos">✓ Fichier(s) téléchargé(s) : vous les trouverez dans « Téléchargements ».</span>'; return; }
+      var c = POS.comptes[i];
+      remplirPosition(c).then(function(buf){
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+        a.download = 'Position_bancaire_' + frDate(POS.date).replace(/\//g, '.') + '_n' + c.num + (POS.comptes.length > 1 ? '_' + c.banque : '') + '.xlsx';
+        document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+        setTimeout(function(){ suite(i + 1); }, 400);
+      }).catch(function(e){ err.textContent = 'Fichier non créé : ' + e.message; });
+    };
+    suite(0);
+  });
+}
+function ouvrirGmailAdmin(){
+  var u = 'https://mail.google.com/mail/?authuser=pharmaciecsudachat@gmail.com&view=cm&fs=1' +
+    '&to=' + encodeURIComponent(document.getElementById('pA').value) + '&cc=' + encodeURIComponent(document.getElementById('pCc').value) +
+    '&su=' + encodeURIComponent(document.getElementById('pO').value) + '&body=' + encodeURIComponent(document.getElementById('pT').value);
+  window.open(u, '_blank');
+}
+function copierMailAdmin(){
+  var t = document.getElementById('pT').value;
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){ document.getElementById('pErr').innerHTML = '<span class="pos">✓ Texte copié.</span>'; }, function(){ prompt('Copiez ce texte :', t); });
+  else prompt('Copiez ce texte :', t);
+}
+function noterDemande(){
+  var cles = [];
+  POS.comptes.forEach(function(c){ c.lignes.forEach(function(l){ cles.push(l.cle); }); });
+  if (!confirm('Noter la date de demande de virement (' + frDate(POS.date) + ') sur ' + cles.length + ' dossier(s) ?\nÀ faire seulement une fois le mail envoyé à l\'administrateur.')) return;
+  lsSet('triRJ_posNum', String(Math.max.apply(null, POS.comptes.map(function(c){ return c.num; }))));
+  var err = document.getElementById('pErr');
+  var suite = function(){
+    if (!cles.length) { fermer(); chargerTreso(); return; }
+    appel('mob_majDossier', [JETON, cles.shift(), 'demande', POS.date], suite, function(m){ err.textContent = 'Non enregistré : ' + m; });
+  };
+  suite();
 }
 
 function sauverLigne(x){
