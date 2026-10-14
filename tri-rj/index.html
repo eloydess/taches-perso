@@ -132,6 +132,7 @@
   <h2>🔒 Pharmacie — Tri & RJ</h2>
   <p>Code d'accès</p>
   <input id="code" type="password" inputmode="numeric" maxlength="12" autocomplete="off" onkeydown="if(event.key==='Enter')connexion()">
+  <label style="display:block;margin:6px 0;font-size:14px;cursor:pointer"><input type="checkbox" onchange="document.getElementById('code').type=this.checked?'text':'password'"> Afficher le code</label>
   <button class="btn" onclick="connexion()">Entrer</button>
   <div id="errConn" class="erreur"></div>
 </div>
@@ -243,7 +244,9 @@ function appel(fn, args, ok, ko){
 }
 
 function connexion(){
-  var code = document.getElementById('code').value.replace(/\s/g, '');
+  // clavier AZERTY d'ordinateur : la rangée du haut sans Maj donne & é " ' ( - è _ ç à au lieu de 1 2 3 4 5 6 7 8 9 0
+  var azerty = { '&': '1', 'é': '2', '"': '3', "'": '4', '(': '5', '-': '6', 'è': '7', '_': '8', 'ç': '9', 'à': '0' };
+  var code = document.getElementById('code').value.replace(/\s/g, '').replace(/[&é"'(\-è_çà]/g, function(c){ return azerty[c]; });
   document.getElementById('errConn').textContent = code ? 'Connexion…' : 'Tapez le code.';
   if (!code) return;
   appel('mob_connexion', [code], function(j){
