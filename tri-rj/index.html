@@ -784,11 +784,29 @@ function facturesManquantes(force){
     if (r.trouvees.length) appel('mob_tresorerie', [JETON], function(t){ TRESO = t; afficherTreso(); }); else afficherTreso();
   }, function(m){ FACT_AUTO.enCours = false; FACT_AUTO.msg = 'Recherche des factures impossible : ' + m; afficherTreso(); });
 }
+function soldesActualises(){ return !!(TRESO && TRESO.soldes && Object.keys(TRESO.soldes).some(function(b){ return TRESO.soldes[b] && TRESO.soldes[b].actuel != null; })); }
+function soldeDe(b){ var s = TRESO.soldes[b]; if (!s) return null; return s.actuel != null ? s.actuel : s.montant; }
+function detailSolde(b){
+  var s = TRESO.soldes[b]; if (!s || s.actuel == null) return '';
+  var d = s.depuis || { total: 0, liste: [], sansMontant: [] };
+  if (!d.liste.length && !d.sansMontant.length) return '<div class="meta">Aucun virement depuis cette saisie.</div>';
+  return '<details class="meta"><summary>Saisi ' + eur(s.saisi) + ' − ' + d.liste.length + ' virement(s) depuis : ' + eur(d.total) + '</summary>' +
+    d.liste.map(function(v){ return '<div>• ' + esc(v.tiers) + ' — ' + eur(v.montant) + ' <span class="meta">(' + esc(v.origine) + ', ' + esc(String(v.quand).slice(0, 10)) + ')</span></div>'; }).join('') +
+    (d.sansMontant.length ? '<div class="neg">Montant inconnu, non déduit : ' + d.sansMontant.map(function(v){ return esc(v.tiers); }).join(', ') + '</div>' : '') +
+    '<div>Si un de ces virements était déjà débité au moment de la saisie, mettez le solde à jour.</div></details>';
+}
 function totauxTreso(){
-  var t = { du: 0, nDu: 0, sansMontant: 0, vir: 0, nVir: 0, parBanque: { CEBPL: 0, BPGO: 0 } };
+  var t = { du: 0, nDu: 0, sansMontant: 0, vir: 0, nVir: 0, parBanque: { CEBPL: 0, BPGO: 0 }, duDeduit: 0 };
   TRESO.lignes.forEach(function(l){
+    if (soldesActualises() && l.du > 0 && (l.validation || l.preuve)) t.duDeduit += l.du;   // déjà sorti du compte
     if (l.du != null) { t.du += l.du; t.nDu++; } else t.sansMontant++;
-    if (l.choisi) { var m = l.montantVir || 0; t.vir += m; t.nVir++; t.parBanque[l.banqueVir] = (t.parBanque[l.banqueVir] || 0) + m; }
+    if (l.choisi) {
+      var m = l.montantVir || 0;
+      // Déjà déduit du solde actualisé (virement validé, preuve envoyée ou facture soldée) : ne pas le compter deux fois.
+      var dejaDeduit = soldesActualises() && (l.validation || l.preuve || (l.du != null && l.du <= 0));
+      if (dejaDeduit) m = 0;
+      t.vir += m; t.nVir++; t.parBanque[l.banqueVir] = (t.parBanque[l.banqueVir] || 0) + m;
+    }
   });
   return t;
 }
@@ -797,21 +815,21 @@ function afficherTreso(){
   var t = totauxTreso();
   var h = '<div class="rjResume"><div class="carte"><b>🏦 Soldes disponibles</b>' +
     ['CEBPL', 'BPGO'].map(function(b){
-      var s = TRESO.soldes[b];
-      var reste = s && s.montant != null ? s.montant - (t.parBanque[b] || 0) : null;
-      return '<div style="margin-top:8px"><div class="ligne1"><span>' + NOMS_BANQUE[b] + '</span><b>' + (s ? eur(s.montant) : 'non saisi') + '</b></div>' +
+      var s = TRESO.soldes[b], sd = soldeDe(b);
+      var reste = sd != null ? sd - (t.parBanque[b] || 0) : null;
+      return '<div style="margin-top:8px"><div class="ligne1"><span>' + NOMS_BANQUE[b] + (s && s.actuel != null ? ' <span class="meta">(estimé maintenant)</span>' : '') + '</span><b>' + (s ? eur(sd) : 'non saisi') + '</b></div>' +
         '<div class="meta">' + (s ? 'saisi le ' + esc(s.date) : 'Saisissez le solde du jour') + ' · <a href="#" onclick="saisirSolde(\'' + b + '\');return false">mettre à jour</a></div>' +
+        (s ? detailSolde(b) : '') +
         (t.parBanque[b] ? '<div class="meta">Après les virements choisis : <b class="' + (reste != null && reste < 0 ? 'neg' : 'pos') + '">' + (reste == null ? '—' : eur(reste)) + '</b></div>' : '') +
         '</div>';
     }).join('') + (function(){
-      var c = TRESO.soldes.CEBPL, b = TRESO.soldes.BPGO;
-      var mc = c && c.montant != null ? c.montant : null, mb = b && b.montant != null ? b.montant : null;
+      var mc = soldeDe('CEBPL'), mb = soldeDe('BPGO');
       if (mc == null && mb == null) return '';
       var tot = (mc || 0) + (mb || 0), apres = tot - t.vir;
       return '<div class="tot" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bord)">' +
         '<span><b>Total des deux comptes</b>' + (mc == null || mb == null ? ' <span class="meta">(un solde manque)</span>' : '') + '</span><b>' + eur(tot) + '</b>' +
         (t.vir ? '<span>Après les virements choisis</span><b class="' + (apres < 0 ? 'neg' : 'pos') + '">' + eur(apres) + '</b>' : '') +
-        '<span>Après paiement de tout le dû</span><b class="' + (tot - t.du < 0 ? 'neg' : 'pos') + '">' + eur(tot - t.du) + '</b></div>';
+        '<span>Après paiement de tout le dû</span><b class="' + (tot - t.du + t.duDeduit < 0 ? 'neg' : 'pos') + '">' + eur(tot - t.du + t.duDeduit) + '</b></div>';
     })() + '</div>';
   h += '<div class="carte"><div class="tot">' +
     '<span>Total dû (' + t.nDu + ' factures)</span><b>' + eur(t.du) + '</b>' +
@@ -843,6 +861,7 @@ function afficherTreso(){
         '<select onchange="changer(' + i + ', \'priorite\', this.value)"><option value="">Priorité</option>' + [['1', '1 · Urgent'], ['2', '2 · Normal'], ['3', '3 · Plus tard']].map(function(p){ return '<option value="' + p[0] + '"' + (x.priorite === p[0] ? ' selected' : '') + '>' + p[1] + '</option>'; }).join('') + '</select></div>' : '') +
       '</div></div></div>';
   }).join('');
+  h += blocLivraison();
   if (TRESO.clotures) h += '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="archiver()">📦 Ranger ' + TRESO.clotures + ' dossier(s) clôturé(s) dans les archives</button>';
   h += '<p class="meta">Source : ' + esc(TRESO.source) + '. Mis à jour : ' + esc(TRESO.maj) + '.</p></div>';
   document.getElementById('treso').innerHTML = h;
@@ -1319,6 +1338,29 @@ function envoyerGroupe(){
     }, function(msg){ echecs++; z.innerHTML = '<span class="neg">Non envoyé : ' + esc(msg) + '</span>'; k = i + 1; suite(); });
   };
   suite();
+}
+
+/* ---------- Payés et clôturés, en attente de livraison : leurs mails restent dans la boîte de réception ---------- */
+function blocLivraison(){
+  var l = TRESO.attenteLivraison || [];
+  if (!l.length) return '';
+  return '<h3 style="margin:16px 0 4px">📦 Payés — livraison à confirmer (' + l.length + ')</h3>' +
+    '<p class="meta">Leurs mails restent dans la boîte de réception tant que la livraison n\'est pas confirmée. Dès que vous indiquez « Livrée en totalité » ou « Sans livraison », le dossier peut être archivé et ses mails rangés.</p>' +
+    l.map(function(x, k){
+      return '<div class="carte"><div class="ligne1"><span class="tiers">' + esc(x.tiers) + '</span><span class="montant">' + (x.montant != null ? eur(x.montant) : '') + '</span></div>' +
+        '<div class="meta">' + esc(x.refs) + (x.preuve ? ' · 📨 preuve envoyée le ' + esc(x.preuve) : '') + '</div>' +
+        '<div class="meta">' + esc(x.livraison || 'Livraison non renseignée') + '</div>' +
+        '<div class="opts" id="lv' + k + '"><button class="pj" onclick="livrer(' + k + ',\'🟢 Livrée en totalité\')">🟢 Livrée en totalité</button>' +
+        '<button class="pj" onclick="livrer(' + k + ',\'🟠 Livrée partiellement\')">🟠 Partiellement</button>' +
+        '<button class="pj" onclick="livrer(' + k + ',\'⚪ Sans livraison attendue\')">⚪ Sans livraison</button>' +
+        (x.lien ? '<button class="pj" onclick="window.open(\'' + esc(x.lien) + '\',\'_blank\')">📧 Mail d\'origine</button>' : '') + '</div></div>';
+    }).join('');
+}
+function livrer(k, valeur){
+  var x = TRESO.attenteLivraison[k], z = document.getElementById('lv' + k);
+  z.innerHTML = '<span class="meta">Enregistrement…</span>';
+  appel('mob_majDossier', [JETON, x.cle, 'livraison', valeur], function(){ chargerTreso(); },
+    function(m){ z.innerHTML = '<span class="neg">' + esc(m) + '</span>'; });
 }
 
 function sauverLigne(x){
