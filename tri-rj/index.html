@@ -128,7 +128,8 @@
 .tpos th,.tpos td{border-bottom:1px solid var(--bord);padding:6px 4px;text-align:left;vertical-align:top}
 .lienfic{color:var(--bleu);text-decoration:underline;cursor:pointer;font-size:12px}
 .badgesP{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-.bpc{font-size:12px;border-radius:12px;padding:2px 9px;border:1px solid var(--bord)}
+.bpc{font-size:12px;border-radius:12px;padding:2px 9px;border:1px solid var(--bord);cursor:pointer}
+.bpc:hover{filter:brightness(.95);text-decoration:underline}
 .bpc-ok{background:#ecfdf3;color:#05603a;border-color:#a6f4c5}
 .bpc-non{background:#f9fafb;color:#98a2b3}
 </style>
@@ -792,7 +793,7 @@ function afficherTreso(){
       (x.verse ? '<div class="meta verse">💶 Facture ' + eur(x.montantTTC) + ' · déjà versé ' + eur(x.verse) + ' (' + x.versements.length + ' fois) · <b>reste ' + eur(x.du) + '</b></div>' : '') +
       '<div class="meta">' + esc(x.statut) + (x.source !== 'Fichier RJ' ? ' · 📬 ' + esc(x.source) : '') + '</div>' +
       (x.source === 'Fichier RJ' ? '<div class="etapes">' + etape('📤 Demande', x.demande) + etape('✔ Validé', x.validation) + etape('📨 Preuve envoyée', x.preuve) + '</div>' +
-        '<div onclick="dossier(' + i + ')" style="cursor:pointer" title="Voir les pièces">' + badgesPieces(x) + '</div>' +
+        badgesPieces(x) +
         (x.commentaire ? '<div class="meta com">' + esc(x.commentaire) + '</div>' : '') +
         '<div class="opts"><button class="pj" onclick="dossier(' + i + ')">✏️ Mettre à jour le dossier</button>' +
         (x.lien ? '<button class="pj" onclick="window.open(\'' + esc(x.lien) + '\',\'_blank\')">📧 Mail d\'origine</button>' : '') + '</div>' : '') +
@@ -1151,9 +1152,33 @@ function blocVersements(x){
 /* ---------- Pièces du dossier : preuve de virement, facture, autres documents (rangées dans Drive) ---------- */
 var GENRES_PIECE = { preuve: '📨 Preuve de virement', facture: '🧾 Facture', document: '📄 Document' };
 function badgesPieces(x){
-  var b = function(n, ok, txt){ return '<span class="bpc ' + (ok ? 'bpc-ok' : 'bpc-non') + '">' + txt + (ok ? ' ✓' + (n > 1 ? ' ×' + n : '') : ' —') + '</span>'; };
-  return '<div class="badgesP">' + b(x.preuves || 0, x.preuves > 0, '📨 Preuve') + b(x.factures || 0, x.factures > 0, '🧾 Facture') +
-    (x.documents ? b(x.documents, true, '📄 Document') : '') + '</div>';
+  var i = TRESO && TRESO.lignes ? TRESO.lignes.indexOf(x) : -1;
+  var b = function(n, ok, txt, genre){
+    return '<span class="bpc ' + (ok ? 'bpc-ok' : 'bpc-non') + '"' + (i >= 0 ? ' onclick="event.stopPropagation();ouvrirPieces(' + i + ',\'' + genre + '\')" title="' + (ok ? 'Voir le document' : 'Ajouter le document') + '"' : '') + '>' +
+      txt + (ok ? ' ✓' + (n > 1 ? ' ×' + n : '') : ' —') + '</span>'; };
+  return '<div class="badgesP">' + b(x.preuves || 0, x.preuves > 0, '📨 Preuve', 'preuve') + b(x.factures || 0, x.factures > 0, '🧾 Facture', 'facture') +
+    (x.documents ? b(x.documents, true, '📄 Document', 'document') : '') + '</div>';
+}
+/* Clic sur une pastille : affiche directement le document (ou ouvre le dossier pour l'ajouter s'il manque). */
+function ouvrirPieces(i, genre, n){
+  var x = TRESO.lignes[i]; DOSSIER = i;
+  var nb = { preuve: x.preuves, facture: x.factures, document: x.documents }[genre] || 0;
+  if (!nb) { dossier(i); return; }
+  var montrer = function(){
+    var ps = (x.pieces || []).filter(function(p){ return p.genre === genre; });
+    if (!ps.length) { dossier(i); return; }
+    var k = Math.max(0, Math.min(n || 0, ps.length - 1));
+    voirPiece(ps[k].id, x.cle, function(){ fermer(); });
+    var nav = document.createElement('span');
+    nav.innerHTML = (ps.length > 1 ? ' <b>' + (k + 1) + ' / ' + ps.length + '</b> ' +
+        (k > 0 ? '<button class="pj" onclick="ouvrirPieces(' + i + ',\'' + genre + '\',' + (k - 1) + ')">← Précédent</button> ' : '') +
+        (k < ps.length - 1 ? '<button class="pj" onclick="ouvrirPieces(' + i + ',\'' + genre + '\',' + (k + 1) + ')">Suivant →</button> ' : '') : '') +
+      ' <button class="pj" onclick="dossier(' + i + ')">📂 Ouvrir le dossier</button>';
+    var corps = document.getElementById('mCorps'); corps.insertBefore(nav, corps.children[2] || null);
+  };
+  if (x.pieces) return montrer();
+  document.getElementById('mTitre').textContent = x.tiers; document.getElementById('mCorps').innerHTML = '<div class="chargement">Chargement…</div>'; ouvrir();
+  appel('mob_pieces', [JETON, x.cle], function(r){ majCompte(x, r); montrer(); }, function(m){ document.getElementById('mCorps').innerHTML = '<div class="erreur">' + esc(m) + '</div>'; });
 }
 function blocPreuve(x){
   return '<div class="carte" style="margin-top:12px;background:#f8f9fb"><b>📎 Pièces du dossier</b>' +
