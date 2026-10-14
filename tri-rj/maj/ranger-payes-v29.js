@@ -30,15 +30,13 @@ function rp_filDepuisLien_(lien) {
   return m ? pc_decHex_(m[1]) : '';
 }
 
-/** Étiquette du dossier : celle d'une fiche rattachée si elle existe, sinon devinée ; créée si le tiers est un nom simple. */
+/** Étiquette du dossier : celle d'une fiche rattachée si elle existe dans Gmail, sinon devinée parmi les étiquettes existantes. */
 function rp_etiquette_(tiers, proposee) {
   var noms = rg_etiquettes_().map(function (e) { return e.nom; });
   if (proposee && noms.indexOf(proposee) >= 0) return proposee;
   var e = rg_devine_(tiers);
   if (e) return e;
-  var simple = String(tiers || '').trim();
-  if (/^[A-Za-zÀ-ÿ0-9' &.\-]{3,30}$/.test(simple) && !/ via |\(|\//i.test(simple)) return 'LABORATOIRES/' + simple.toUpperCase();
-  return '';
+  return '';   // aucune étiquette existante : pas de création automatique, Pierre choisit avec « Ranger »
 }
 
 function rp_dossiersPayes_() {
@@ -103,7 +101,7 @@ function rg_rangerPayes_() {
   var aValider = fiches.filter(function (l) { return g(l, 'Statut') === 'À valider'; }).map(function (l) { return g(l, 'Références') + ' ' + g(l, 'Objet'); }).join(' ');
   rp_dossiersPayes_().forEach(function (d) {
     if (Date.now() - debut > RP.MAX_S * 1000) return;
-    d.numeros = rp_numeros_(d.refs).filter(function (t) { return (compte[t] || 0) <= 1 && aValider.indexOf(t) < 0; });
+    d.numeros = rp_numeros_(d.refs).filter(function (t) { return (compte[t] || 0) <= 1; });
     // fiches rattachées (même lien, ou mêmes tiers + références, ou un numéro du dossier dans les références de la fiche)
     var rattachees = fiches.filter(function (l) {
       var id = g(l, 'ID');
