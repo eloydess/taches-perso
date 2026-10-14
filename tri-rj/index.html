@@ -1167,7 +1167,7 @@ function blocPreuve(x){
     '<button class="btn b-corr" style="flex:1" onclick="preparerEnvoi(\'relance\')">🔔 Relancer (non reçu)</button></div>' +
     '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="positionAdmin([TRESO.lignes[DOSSIER].cle])">🏛 Pour l\'administrateur : position bancaire + preuve + facture</button></div>';
 }
-function majCompte(x, r){ x.preuves = r.compte.preuve; x.factures = r.compte.facture; x.documents = r.compte.document; x.pieces = r.pieces; }
+function majCompte(x, r){ if (!r || !r.compte) return; x.preuves = r.compte.preuve; x.factures = r.compte.facture; x.documents = r.compte.document; x.pieces = r.pieces; }
 function afficherPieces(x){
   var z = document.getElementById('pcListe'); if (!z) return;
   var l = x.pieces || [];
