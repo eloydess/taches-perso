@@ -23,6 +23,14 @@
   .onglets button.actif{background:#fff;color:var(--bleu)}
   .bandeau{background:var(--jaune);color:#7a4a00;font-size:13px;padding:6px 14px}
   main{padding:12px;max-width:760px;margin:0 auto}
+  @media (min-width:1000px){
+    main{max-width:1280px}
+    header h1,.onglets{max-width:1280px;margin-left:auto;margin-right:auto}
+    #liste{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+    #liste .carte{margin-bottom:0}
+    #vCR{display:grid;grid-template-columns:420px 1fr;gap:16px;align-items:start}
+    .modal .boite{max-width:900px;margin:0 auto}
+  }
   .filtres{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto}
   .filtres button{border:1px solid var(--bord);background:#fff;border-radius:16px;padding:6px 12px;white-space:nowrap}
   .filtres button.actif{background:var(--bleu);color:#fff;border-color:var(--bleu)}
@@ -76,6 +84,9 @@
   .et{font-size:12px;padding:3px 7px;border-radius:12px;background:#eef0f3;color:var(--doux)}
   .et.fait{background:#e3f5ea;color:var(--vert);font-weight:600}
   .com{white-space:pre-wrap;margin-top:4px}
+  .pagecr{display:flex;align-items:center;gap:8px;margin:6px 0}
+  .pagecr img{width:64px;height:84px;object-fit:cover;border-radius:6px;border:1px solid var(--bord)}
+  .pdfcr{width:64px;height:84px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;border:1px solid var(--bord);border-radius:6px;overflow:hidden}
   .choisi{border-color:var(--vert);box-shadow:0 0 0 1px var(--vert) inset}
   table.rj{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
   table.rj td,table.rj th{border-bottom:1px solid var(--bord);padding:6px;text-align:left;vertical-align:top}
@@ -97,6 +108,7 @@
     <div class="onglets">
       <button id="oMail" class="actif" onclick="vue('mail')">📬 Boîte mail</button>
       <button id="oRJ" onclick="vue('rj')">💶 Paiements RJ</button>
+      <button id="oCR" onclick="vue('cr')">📮 Courrier</button>
     </div>
   </header>
   <div class="bandeau">Mode test : vos décisions sont enregistrées, Gmail n'est pas modifié et les mails restent dans leur état lu / non lu.</div>
@@ -107,6 +119,18 @@
     </section>
     <section id="vRJ" style="display:none">
       <div id="treso"><div class="chargement">Chargement…</div></div>
+    </section>
+    <section id="vCR" style="display:none">
+      <div class="carte">
+        <b>📮 Scanner un courrier reçu par la poste</b>
+        <p class="meta">Prenez chaque page en photo (ou choisissez un PDF). Claude lit le courrier, prépare une fiche dans « Boîte mail » et, s'il y a un paiement, il s'ajoute au suivi RJ dès que vous validez.</p>
+        <div class="champ"><label>Note (facultatif)</label><input id="crNote" placeholder="ex. Facture Orkyn reçue ce matin"></div>
+        <label class="btn b-voir" style="display:block;text-align:center;cursor:pointer">📷 Ajouter des pages<input id="crFic" type="file" accept="image/*,application/pdf" multiple style="display:none" onchange="ajouterPages(this)"></label>
+        <div id="crPages" style="margin-top:8px"></div>
+        <div id="crErr" class="erreur"></div>
+        <button id="crOk" class="btn b-ok" style="width:100%;margin-top:8px;display:none" onclick="envoyerCourrier()">Envoyer pour analyse</button>
+      </div>
+      <div id="crListe"></div>
     </section>
   </main>
 </div>
@@ -214,6 +238,9 @@ function charger(){
 function vue(v){
   document.getElementById('vMail').style.display = v === 'mail' ? '' : 'none';
   document.getElementById('vRJ').style.display = v === 'rj' ? '' : 'none';
+  document.getElementById('vCR').style.display = v === 'cr' ? '' : 'none';
+  document.getElementById('oCR').className = v === 'cr' ? 'actif' : '';
+  if (v === 'cr') chargerCourriers();
   document.getElementById('oMail').className = v === 'mail' ? 'actif' : '';
   document.getElementById('oRJ').className = v === 'rj' ? 'actif' : '';
   if (v === 'rj') chargerTreso();
@@ -254,7 +281,7 @@ function carte(f){
     (traite ? '<div class="statut st-' + esc(f['Statut']) + '">' + esc(f['Statut']) + (f['Décision finale'] ? ' → ' + esc(lib(f['Décision finale'])) : '') +
       (f['Commentaire Pierre'] ? ' · « ' + esc(f['Commentaire Pierre']) + ' »' : '') + ' (' + esc(f['Date validation']) + ')</div>' : '') +
     '<div class="actions">' +
-      '<button class="b-voir" onclick="voirMail(\'' + id + '\')">📄 Voir le mail</button>' +
+      '<button class="b-voir" onclick="voirMail(\'' + id + '\')">' + (/^C-/.test(f['ID']) ? '📮 Voir le courrier' : '📄 Voir le mail') + '</button>' +
       '<button class="b-voir" onclick="repondre(\'' + id + '\')">✉️ Répondre' + (f['Réponse proposée'] ? ' (texte prêt)' : '') + '</button>' +
       (traite
         ? '<button class="b-corr" onclick="decider(\'' + id + '\',\'À valider\')">↩︎ Annuler ma décision</button>'
@@ -459,6 +486,7 @@ function envoyerReponse(){
 /* ---------- Lecture du mail et des pièces jointes ---------- */
 var MAIL_ID = null;
 function voirMail(id){
+  if (/^C-/.test(id)) { voirCourrier(id, 0); return; }
   MAIL_ID = id;
   var f = trouver(id);
   document.getElementById('mTitre').textContent = f['Tiers'] + ' — ' + f['Objet'];
@@ -671,6 +699,84 @@ function chargerTampon(){
       l.map(function(r){ return '<tr><td><b>' + esc(r['Tiers']) + '</b><div class="meta">' + esc(r['Antériorité']) + '</div></td><td>' + esc(r['Références']) +
         '</td><td>' + esc(r['Montant TTC (source)']) + '</td><td>' + esc(r['Transféré au suivi RJ']) + '</td></tr>'; }).join('') + '</table>';
   });
+}
+
+/* ---------- Onglet Courrier : courriers postaux scannés ---------- */
+var PAGES = [];
+function poidsPages(){ return PAGES.reduce(function(s, p){ return s + Math.floor(p.b64.length * 3 / 4); }, 0); }
+function reduireImage(fichier, fin){
+  var lecteur = new FileReader();
+  lecteur.onload = function(){
+    var img = new Image();
+    img.onload = function(){
+      var max = 2200, r = Math.min(1, max / Math.max(img.width, img.height));
+      var c = document.createElement('canvas'); c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      var url = c.toDataURL('image/jpeg', 0.85);
+      fin({ nom: (fichier.name || 'page').replace(/\.[^.]+$/, '') + '.jpg', type: 'image/jpeg', b64: url.split(',')[1], apercu: url });
+    };
+    img.onerror = function(){ var u = String(lecteur.result); fin({ nom: fichier.name, type: fichier.type || 'image/jpeg', b64: u.split(',')[1], apercu: '' }); };
+    img.src = lecteur.result;
+  };
+  lecteur.readAsDataURL(fichier);
+}
+function ajouterPages(input){
+  var fichiers = Array.prototype.slice.call(input.files || []); input.value = '';
+  var err = document.getElementById('crErr'); err.textContent = '';
+  var suite = function(){
+    if (!fichiers.length) { afficherPages(); return; }
+    var f = fichiers.shift();
+    if (PAGES.length >= 12) { err.textContent = '12 pages au maximum par courrier.'; afficherPages(); return; }
+    if (/pdf/i.test(f.type)) {
+      var l = new FileReader();
+      l.onload = function(){ PAGES.push({ nom: f.name, type: 'application/pdf', b64: String(l.result).split(',')[1], apercu: '' }); suite(); };
+      l.readAsDataURL(f);
+    } else reduireImage(f, function(p){ PAGES.push(p); suite(); });
+  };
+  suite();
+}
+function afficherPages(){
+  document.getElementById('crPages').innerHTML = PAGES.map(function(p, i){
+    return '<div class="pagecr">' + (p.apercu ? '<img src="' + p.apercu + '">' : '<div class="pdfcr">📄 ' + esc(p.nom) + '</div>') +
+      '<button class="pj" onclick="PAGES.splice(' + i + ',1);afficherPages()">✕ Retirer</button><span class="meta">Page ' + (i + 1) + '</span></div>';
+  }).join('') + (PAGES.length ? '<p class="meta">' + PAGES.length + ' page(s) · ' + Math.ceil(poidsPages() / 1024) + ' Ko</p>' : '');
+  document.getElementById('crOk').style.display = PAGES.length ? 'block' : 'none';
+}
+function envoyerCourrier(){
+  var err = document.getElementById('crErr'), b = document.getElementById('crOk');
+  if (poidsPages() > 20 * 1024 * 1024) { err.textContent = 'Photos trop lourdes (20 Mo au maximum).'; return; }
+  b.disabled = true; b.textContent = 'Envoi en cours…';
+  appel('mob_courrier', [JETON, PAGES.map(function(p){ return { nom: p.nom, type: p.type, b64: p.b64 }; }), document.getElementById('crNote').value], function(r){
+    PAGES = []; document.getElementById('crNote').value = ''; afficherPages();
+    b.disabled = false; b.textContent = 'Envoyer pour analyse';
+    err.innerHTML = '<span class="pos">✓ Courrier enregistré (' + r.pages + ' page(s)). Claude l\'analysera au prochain passage.</span>';
+    chargerCourriers();
+  }, function(m){ err.textContent = m; b.disabled = false; b.textContent = 'Réessayer'; });
+}
+function chargerCourriers(){
+  appel('mob_courriers', [JETON], function(l){
+    document.getElementById('crListe').innerHTML = l.length ? '<h3 style="margin:14px 4px 6px">Courriers envoyés</h3>' + l.map(function(c){
+      return '<div class="carte"><div class="ligne1"><span class="tiers">' + esc(c.note || 'Courrier sans note') + '</span><span class="badge ' + (c.statut === 'Analysé' ? 'p-Basse' : 'p-Moyenne') + '">' + esc(c.statut) + '</span></div>' +
+        '<div class="meta">' + esc(c.date) + ' · ' + esc(c.pages) + ' page(s)</div>' +
+        '<div class="opts"><button class="pj" onclick="voirCourrier(\'' + esc(c.id) + '\',0)">📮 Voir</button></div></div>';
+    }).join('') : '';
+  }, function(m){ document.getElementById('crListe').innerHTML = '<div class="erreur">' + esc(m) + '</div>'; });
+}
+function voirCourrier(id, page){
+  document.getElementById('mTitre').textContent = 'Courrier — page ' + (page + 1);
+  document.getElementById('mCorps').innerHTML = '<div id="pjZone" class="chargement">Chargement…</div>';
+  ouvrir();
+  appel('mob_scan', [JETON, id, page], function(p){
+    var zone = document.getElementById('pjZone'); zone.className = '';
+    var nav = '<div class="opts" style="margin-bottom:8px">' + (page > 0 ? '<button class="pj" onclick="voirCourrier(\'' + esc(id) + '\',' + (page - 1) + ')">← Page ' + page + '</button>' : '') +
+      (page < p.pages - 1 ? '<button class="pj" onclick="voirCourrier(\'' + esc(id) + '\',' + (page + 1) + ')">Page ' + (page + 2) + ' →</button>' : '') +
+      (trouver(id) ? '<button class="pj" onclick="repondre(\'' + esc(id) + '\')">✉️ Répondre</button>' : '') + '</div>';
+    if (/pdf/i.test(p.type)) {
+      zone.innerHTML = nav; var bin = atob(p.b64), o = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) o[i] = bin.charCodeAt(i);
+      var z2 = document.createElement('div'); zone.appendChild(z2); afficherPDF(o, z2);
+    } else zone.innerHTML = nav + '<img style="max-width:100%" src="data:' + esc(p.type) + ';base64,' + p.b64 + '">';
+  }, function(m){ document.getElementById('pjZone').innerHTML = '<div class="erreur">' + esc(m) + '</div>'; });
 }
 
 function ouvrir(){ document.getElementById('modal').style.display = 'block'; }
