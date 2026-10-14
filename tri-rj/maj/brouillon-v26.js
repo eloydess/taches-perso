@@ -16,7 +16,7 @@ function mob_brouillonAdmin(jeton, a, cc, objet, texte, pjs) {
   pjs = pjs || [];
   var total = 0;
   pjs.forEach(function (p) { total += Math.floor(String(p.b64 || '').length * 3 / 4); });
-  if (total > 20 * 1024 * 1024) throw new Error('Pièces jointes trop lourdes (20 Mo au maximum).');
+  if (total > 24 * 1024 * 1024) throw new Error('Pièces jointes trop lourdes (24 Mo au maximum) : faites deux envois.');
   var limite = 'limite_' + Utilities.getUuid().replace(/-/g, '');
   var L = ['To: ' + dests.join(', ')];
   if (copies.length) L.push('Cc: ' + copies.join(', '));
@@ -39,7 +39,12 @@ function mob_brouillonAdmin(jeton, a, cc, objet, texte, pjs) {
     L.push(String(p.b64).replace(/[^A-Za-z0-9+\/=]/g, '').replace(/(.{76})/g, '$1\r\n'));
   });
   L.push('--' + limite + '--');
-  var r = mob_gmailApi_('post', 'drafts', { message: { raw: Utilities.base64EncodeWebSafe(L.join('\r\n')) } });
+  // envoi « upload » (jusqu'à 35 Mo) plutôt que JSON (limité à 5 Mo)
+  var rep = UrlFetchApp.fetch('https://gmail.googleapis.com/upload/gmail/v1/users/me/drafts?uploadType=media', {
+    method: 'post', contentType: 'message/rfc822', payload: Utilities.newBlob(L.join('\r\n')).getBytes(),
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true });
+  if (rep.getResponseCode() < 200 || rep.getResponseCode() >= 300) throw new Error('Gmail a refusé le brouillon (' + rep.getResponseCode() + ') : ' + rep.getContentText().slice(0, 200));
+  var r = JSON.parse(rep.getContentText());
   var msgId = r.message && r.message.id;
   journal_('Brouillon pour l\'administrateur créé (' + pjs.length + ' pièce(s) jointe(s))', '', objet);
   return { id: r.id, url: 'https://mail.google.com/mail/?authuser=pharmaciecsudachat@gmail.com#drafts?compose=' + msgId };

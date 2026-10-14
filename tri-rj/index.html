@@ -917,14 +917,14 @@ function dessinerPosition(){
       }).join('') +
       '<tr><td><b>Total</b></td><td style="text-align:right"><b>' + eur(tot) + '</b></td><td class="meta">' + (c.solde != null ? 'solde après : <b class="' + (c.solde - tot < 0 ? 'neg' : 'pos') + '">' + eur(c.solde - tot) + '</b>' : 'solde non saisi') + '</td></tr></table></div>';
   });
-  h += '<button class="btn b-voir" style="width:100%" onclick="telechargerPositions()">⬇️ 1. Télécharger ' + (POS.comptes.length > 1 ? 'les positions bancaires' : 'la position bancaire') + ' (Excel, modèle de l\'administrateur)</button>' +
-    '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="dossierPDF()">⬇️ 2. Télécharger les justificatifs en un seul PDF (preuve + facture de chaque virement)</button>' +
+  h += '<button class="btn b-voir" style="width:100%" onclick="telechargerPositions()">⬇️ 1. (facultatif) Télécharger ' + (POS.comptes.length > 1 ? 'les positions bancaires' : 'la position bancaire') + ' (Excel, modèle de l\'administrateur)</button>' +
+    '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="dossierPDF()">⬇️ 2. (facultatif) Télécharger les justificatifs en un seul PDF (preuve + facture de chaque virement)</button>' +
     '<div class="champ" style="margin-top:10px"><label>À</label><input id="pA" value="' + esc(POS.a) + '" onchange="POS.a=this.value;lsSet(\'triRJ_adminA\',this.value)"></div>' +
     '<div class="champ"><label>Copie</label><input id="pCc" value="' + esc(POS.cc) + '" onchange="POS.cc=this.value;lsSet(\'triRJ_adminCc\',this.value)"></div>' +
     '<div class="champ"><label>Objet</label><input id="pO" value="' + esc(POS.objet || objetMailAdmin()) + '" oninput="POS.objet=this.value"></div>' +
     '<div class="champ"><label>Message (modifiable)</label><textarea id="pT" rows="14" oninput="POS.texte=this.value">' + esc(POS.texte || texteMailAdmin()) + '</textarea></div>' +
-    '<button class="btn b-ok" style="width:100%" onclick="ouvrirGmailAdmin()">✉️ 3. Ouvrir le mail dans Gmail</button>' +
-    '<p class="meta">Dans Gmail, joignez avec le trombone 📎 les 2 fichiers téléchargés (dans « Téléchargements ») : la position bancaire (Excel) et le PDF des justificatifs. Puis envoyez.</p>' +
+    '<button id="pMail" class="btn b-ok" style="width:100%" onclick="preparerMailAdmin()">✉️ 3. Préparer le mail AVEC les pièces jointes (brouillon Gmail)</button>' +
+    '<p class="meta">La position bancaire (Excel) et le PDF des justificatifs sont joints automatiquement. Le mail n\'est pas envoyé : il vous attend dans les brouillons de Gmail pour relecture.</p>' +
     '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="copierMailAdmin()">📋 Copier le texte du mail</button>' +
     '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="noterDemande()">✅ 4. Mail envoyé : noter la demande de virement sur les dossiers</button>' +
     '<div id="pErr" class="erreur"></div>';
@@ -1013,7 +1013,27 @@ function dossierPDF(){
   if (manque.length && !confirm('Il manque :\n- ' + manque.join('\n- ') + '\n\nCréer le PDF quand même ?')) return;
   err.textContent = 'Assemblage du PDF…';
   chargerPdfLib(function(){
-    (async function(){
+    construirePDF(err).then(function(r){
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([r.octets], { type: 'application/pdf' }));
+      a.download = nomPDF();
+      document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+      err.innerHTML = r.echecs.length ? 'PDF créé, mais ces fichiers n\'ont pas pu y être mis (à joindre séparément dans Gmail) : ' + esc(r.echecs.join(' ; ')) : '<span class="pos">✓ PDF des justificatifs téléchargé (' + r.pages + ' pages).</span>';
+    }).catch(function(e){ err.textContent = 'PDF non créé : ' + e.message; });
+  });
+}
+function manquesPos(){
+  var manque = [];
+  POS.comptes.forEach(function(c){ c.lignes.forEach(function(l){
+    if (!piecesDe(l, 'preuve').length) manque.push(intitule(l) + ' : preuve de virement');
+    if (!piecesDe(l, 'facture').length) manque.push(intitule(l) + ' : facture');
+  }); });
+  return manque;
+}
+function nomPDF(){ return 'Justificatifs_virements_' + frDate(POS.date).replace(/\//g, '.') + '_position_' + POS.comptes.map(function(c){ return c.num; }).join('-') + '.pdf'; }
+function nomXLSX(c){ return 'Position_bancaire_' + frDate(POS.date).replace(/\//g, '.') + '_n' + c.num + (POS.comptes.length > 1 ? '_' + c.banque : '') + '.xlsx'; }
+function construirePDF(err){
+    return (async function(){
       var P = PDFLib, doc = await P.PDFDocument.create(), police = await doc.embedFont(P.StandardFonts.Helvetica), gras = await doc.embedFont(P.StandardFonts.HelveticaBold);
       var echecs = [], k = 0;
       var ajouter = async function(f, titre){
@@ -1043,13 +1063,38 @@ function dossierPDF(){
         }
       }
       var octets = await doc.save();
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([octets], { type: 'application/pdf' }));
-      a.download = 'Justificatifs_virements_' + frDate(POS.date).replace(/\//g, '.') + '_position_' + POS.comptes.map(function(c){ return c.num; }).join('-') + '.pdf';
-      document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 2000);
-      err.innerHTML = echecs.length ? 'PDF créé, mais ces fichiers n\'ont pas pu y être mis (à joindre séparément dans Gmail) : ' + esc(echecs.join(' ; ')) : '<span class="pos">✓ PDF des justificatifs téléchargé (' + doc.getPageCount() + ' pages).</span>';
-    })().catch(function(e){ err.textContent = 'PDF non créé : ' + e.message; });
-  });
+      return { octets: octets, pages: doc.getPageCount(), echecs: echecs };
+    })();
+}
+function b64Octets(o){
+  var u = o instanceof Uint8Array ? o : new Uint8Array(o), s = '';
+  for (var i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+/* Prépare un BROUILLON Gmail avec la position bancaire (Excel) et le PDF des justificatifs déjà joints. Rien n'est envoyé. */
+function preparerMailAdmin(){
+  var err = document.getElementById('pErr'), b = document.getElementById('pMail');
+  var manque = manquesPos();
+  if (manque.length && !confirm('Il manque :\n- ' + manque.join('\n- ') + '\n\nPréparer le mail quand même ?')) return;
+  if (POS.comptes.some(function(c){ return c.lignes.length > 23; })) { err.textContent = 'Plus de 23 virements sur un compte : le modèle n\'a que 23 lignes. Faites deux envois.'; return; }
+  b.disabled = true; b.textContent = 'Préparation des pièces jointes…';
+  var fin = function(m){ b.disabled = false; b.textContent = '✉️ 3. Préparer le mail AVEC les pièces jointes (brouillon Gmail)'; if (m) err.textContent = m; };
+  chargerExcelJS(function(){ chargerPdfLib(function(){
+    (async function(){
+      var pjs = [];
+      for (var c of POS.comptes) { err.textContent = 'Position bancaire n° ' + c.num + '…'; pjs.push({ nom: nomXLSX(c), type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', b64: b64Octets(await remplirPosition(c)) }); }
+      var r = await construirePDF(err);
+      pjs.push({ nom: nomPDF(), type: 'application/pdf', b64: b64Octets(r.octets) });
+      err.textContent = 'Création du brouillon dans Gmail…';
+      var d = await appelP('mob_brouillonAdmin', [JETON, document.getElementById('pA').value, document.getElementById('pCc').value, document.getElementById('pO').value, document.getElementById('pT').value, pjs]);
+      POS.brouillon = d.url;
+      fin();
+      err.innerHTML = '<span class="pos">✓ Brouillon prêt dans Gmail avec ' + pjs.length + ' pièce(s) jointe(s) (position bancaire + justificatifs, ' + r.pages + ' pages).</span>' +
+        (r.echecs.length ? '<br>⚠️ Non inclus dans le PDF (à joindre à la main) : ' + esc(r.echecs.join(' ; ')) : '') +
+        '<br><a class="btn b-ok" style="display:inline-block;margin-top:6px;text-decoration:none" target="_blank" href="' + esc(d.url) + '">📂 Ouvrir le brouillon dans Gmail</a> <span class="meta">Relisez-le puis cliquez sur « Envoyer » dans Gmail. Ensuite : bouton 4 ci-dessous.</span>';
+      try { window.open(d.url, '_blank'); } catch (e) {}
+    })().catch(function(e){ fin('Brouillon non créé : ' + e.message); });
+  }); });
 }
 function chargerExcelJS(fin){
   if (window.ExcelJS) return fin();
