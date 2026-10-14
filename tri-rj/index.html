@@ -127,6 +127,10 @@
 .tpos{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
 .tpos th,.tpos td{border-bottom:1px solid var(--bord);padding:6px 4px;text-align:left;vertical-align:top}
 .lienfic{color:var(--bleu);text-decoration:underline;cursor:pointer;font-size:12px}
+.badgesP{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.bpc{font-size:12px;border-radius:12px;padding:2px 9px;border:1px solid var(--bord)}
+.bpc-ok{background:#ecfdf3;color:#05603a;border-color:#a6f4c5}
+.bpc-non{background:#f9fafb;color:#98a2b3}
 </style>
 </head>
 <body>
@@ -721,10 +725,23 @@ function nb(v){ var s = String(v == null ? '' : v).replace(/\s/g, '').replace(/�
 
 function chargerTreso(){
   document.getElementById('treso').innerHTML = '<div class="chargement">Chargement…</div>';
-  appel('mob_tresorerie', [JETON], function(r){ TRESO = r; afficherTreso(); },
+  appel('mob_tresorerie', [JETON], function(r){ TRESO = r; afficherTreso(); facturesManquantes(false); },
     function(m){ document.getElementById('treso').innerHTML = '<div class="erreur">' + esc(m) + '</div>'; });
 }
 
+/* Les factures manquantes sont cherchées automatiquement dans les mails d'origine (une fois par ouverture de l'application). */
+var FACT_AUTO = { fait: false, enCours: false, msg: '' };
+function facturesManquantes(force){
+  if (!TRESO || FACT_AUTO.enCours || (FACT_AUTO.fait && !force)) return;
+  if (!TRESO.lignes.some(function(x){ return x.source === 'Fichier RJ' && !x.factures; })) { FACT_AUTO.fait = true; return; }
+  FACT_AUTO.fait = true; FACT_AUTO.enCours = true; FACT_AUTO.msg = '⏳ Recherche des factures manquantes dans les mails…'; afficherTreso();
+  appel('mob_facturesAuto', [JETON], function(r){
+    FACT_AUTO.enCours = false;
+    FACT_AUTO.msg = (r.trouvees.length ? '✅ ' + r.trouvees.length + ' facture(s) retrouvée(s) et rangée(s) dans les dossiers.' : 'Aucune nouvelle facture trouvée dans les mails.') +
+      (r.sansFacture.length ? ' Sans facture : ' + r.sansFacture.length + ' dossier(s) — ajoutez-la dans le dossier (＋ 🧾 Facture).' : '');
+    if (r.trouvees.length) appel('mob_tresorerie', [JETON], function(t){ TRESO = t; afficherTreso(); }); else afficherTreso();
+  }, function(m){ FACT_AUTO.enCours = false; FACT_AUTO.msg = 'Recherche des factures impossible : ' + m; afficherTreso(); });
+}
 function totauxTreso(){
   var t = { du: 0, nDu: 0, sansMontant: 0, vir: 0, nVir: 0, parBanque: { CEBPL: 0, BPGO: 0 } };
   TRESO.lignes.forEach(function(l){
@@ -760,6 +777,8 @@ function afficherTreso(){
     '<span>✅ Je vire maintenant (' + t.nVir + ')</span><b class="pos">' + eur(t.vir) + '</b>' +
     '<span>Reste dû après ces virements</span><b>' + eur(t.du - t.vir) + '</b>' +
     '</div>' + (t.nVir ? '<button class="btn b-ok" style="width:100%;margin-top:10px" onclick="positionAdmin()">📄 Position bancaire + mail à l\'administrateur</button>' : '') + '<p class="meta" style="margin-bottom:0">Cochez les factures que vous voulez virer maintenant ; vous pouvez changer le montant (virement partiel) et la banque. Rien n\'est viré par l\'application.</p></div>' +
+    '<div class="carte"><div class="meta">' + esc(FACT_AUTO.msg || 'Les factures sont rangées automatiquement dans chaque dossier depuis le mail d\'origine.') + '</div>' +
+      '<button class="btn b-voir" style="width:100%;margin-top:6px"' + (FACT_AUTO.enCours ? ' disabled' : '') + ' onclick="facturesManquantes(true)">🔎 Rechercher les factures manquantes</button></div>' +
     (ECRAN_PC ? '<p class="meta raccourcis">Astuce : cochez les factures à droite ; le total se met à jour ici.</p>' : '') + '</div><div class="rjListe">';
   var ordre = { '1': 0, '2': 1, '3': 2, '': 3 };
   var l = TRESO.lignes.slice().sort(function(a, b){ return (b.choisi - a.choisi) || (ordre[a.priorite] - ordre[b.priorite]) || ((b.du || 0) - (a.du || 0)); });
@@ -771,7 +790,8 @@ function afficherTreso(){
       '<div class="meta">' + esc(x.refs) + (x.date ? ' · ' + esc(x.date) : '') + '</div>' +
       (x.verse ? '<div class="meta verse">💶 Facture ' + eur(x.montantTTC) + ' · déjà versé ' + eur(x.verse) + ' (' + x.versements.length + ' fois) · <b>reste ' + eur(x.du) + '</b></div>' : '') +
       '<div class="meta">' + esc(x.statut) + (x.source !== 'Fichier RJ' ? ' · 📬 ' + esc(x.source) : '') + '</div>' +
-      (x.source === 'Fichier RJ' ? '<div class="etapes">' + etape('📤 Demande', x.demande) + etape('✔ Validé', x.validation) + etape('📨 Preuve', x.preuve) + '</div>' +
+      (x.source === 'Fichier RJ' ? '<div class="etapes">' + etape('📤 Demande', x.demande) + etape('✔ Validé', x.validation) + etape('📨 Preuve envoyée', x.preuve) + '</div>' +
+        '<div onclick="dossier(' + i + ')" style="cursor:pointer" title="Voir les pièces">' + badgesPieces(x) + '</div>' +
         (x.commentaire ? '<div class="meta com">' + esc(x.commentaire) + '</div>' : '') +
         '<div class="opts"><button class="pj" onclick="dossier(' + i + ')">✏️ Mettre à jour le dossier</button>' +
         (x.lien ? '<button class="pj" onclick="window.open(\'' + esc(x.lien) + '\',\'_blank\')">📧 Mail d\'origine</button>' : '') + '</div>' : '') +
@@ -795,10 +815,16 @@ function lsGet(k, d){ try { var v = localStorage.getItem(k); return v == null ? 
 function lsSet(k, v){ try { localStorage.setItem(k, v); } catch(e) {} }
 function aujISO(){ var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
 function frDate(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] : iso; }
+/* Montant du virement : celui saisi, sinon le dernier versement enregistré (facture déjà soldée), sinon le montant de la facture. */
+function montantPos(x){
+  if (x.montantVir > 0) return x.montantVir;
+  if (x.versements && x.versements.length) return x.versements[x.versements.length - 1].montant;
+  return x.du > 0 ? x.du : x.montantTTC;
+}
 function positionAdmin(cles){
   var choisis = cles ? TRESO.lignes.filter(function(x){ return cles.indexOf(x.cle) >= 0; }).map(function(x){
       return Object.assign({}, x, { montantVir: x.montantVir || (x.versements && x.versements.length ? x.versements[x.versements.length - 1].montant : null) || x.montantTTC || x.du, banqueVir: x.banqueVir || 'CEBPL' }); })
-    : TRESO.lignes.filter(function(x){ return x.choisi && x.montantVir > 0; });
+    : TRESO.lignes.filter(function(x){ return x.choisi && montantPos(x) > 0; }).map(function(x){ return Object.assign({}, x, { montantVir: montantPos(x) }); });
   if (!choisis.length) { alert('Cochez d\'abord les factures à virer.'); return; }
   var banques = ['CEBPL', 'BPGO'].filter(function(b){ return choisis.some(function(x){ return (x.banqueVir || 'CEBPL') === b; }); });
   var num = Number(lsGet('triRJ_posNum', '1')) + 1;
@@ -806,11 +832,11 @@ function positionAdmin(cles){
     var s = TRESO.soldes[b];
     return { banque: b, num: num + i, solde: s && s.montant != null ? s.montant : null,
       lignes: choisis.filter(function(x){ return (x.banqueVir || 'CEBPL') === b; }).map(function(x){
-        return { cle: x.cle, tiers: x.tiers, refs: x.refs, montant: x.montantVir, lien: x.lien, preuves: x.preuves || 0, preuve: [], fact: { etat: 'à chercher', fichiers: [] } }; }) };
+        return { cle: x.cle, tiers: x.tiers, refs: x.refs, montant: x.montantVir, lien: x.lien, pieces: x.pieces || null, etat: 'chargement' }; }) };
   }) };
   dessinerPosition();
   ouvrir();
-  chercherFactures();
+  chargerPiecesPosition();
 }
 function totalCompte(c){ return Math.round(c.lignes.reduce(function(s, l){ return s + l.montant; }, 0) * 100) / 100; }
 function intitule(l){ return (String(l.tiers).toUpperCase() + (l.refs ? ' — ' + l.refs : '')).replace(/\s+/g, ' ').slice(0, 70); }
@@ -845,7 +871,7 @@ function dessinerPosition(){
       '<table class="tpos"><tr><th>Virement</th><th>Montant</th><th>Pièces à joindre</th></tr>' +
       c.lignes.map(function(l, li){
         return '<tr><td>' + esc(intitule(l)) + '</td><td style="text-align:right;white-space:nowrap">' + eur(l.montant) + '</td><td class="meta">' +
-          celluleFacture(l, ci, li) + '<br>' + cellulePreuve(l, ci, li) + '</td></tr>';
+          cellulePieces(l, ci, li) + '</td></tr>';
       }).join('') +
       '<tr><td><b>Total</b></td><td style="text-align:right"><b>' + eur(tot) + '</b></td><td class="meta">' + (c.solde != null ? 'solde après : <b class="' + (c.solde - tot < 0 ? 'neg' : 'pos') + '">' + eur(c.solde - tot) + '</b>' : 'solde non saisi') + '</td></tr></table></div>';
   });
@@ -862,19 +888,18 @@ function dessinerPosition(){
     '<div id="pErr" class="erreur"></div>';
   document.getElementById('mCorps').innerHTML = h;
 }
-function celluleFacture(l, ci, li){
-  var f = l.fact;
-  var etat = f.etat === 'trouvée' ? '✅ facture : ' + f.fichiers.map(function(x){ return esc(x.nom); }).join(', ')
-    : f.etat === 'recherche' ? '⏳ recherche de la facture…'
-    : '⚠️ facture ' + esc(f.etat);
-  return etat + ' <label class="lienfic">' + (f.etat === 'trouvée' ? 'remplacer' : 'choisir le fichier') +
-    '<input type="file" accept="application/pdf,image/*" multiple style="display:none" onchange="fichiersLigne(this,' + ci + ',' + li + ',\'fact\')"></label>';
-}
-function cellulePreuve(l, ci, li){
-  return (l.preuve.length ? '✅ ordre de virement : ' + l.preuve.map(function(x){ return esc(x.nom); }).join(', ') : '☐ ordre de virement (capture ou PDF de la banque)') +
-    ' <label class="lienfic">' + (l.preuve.length ? 'remplacer' : 'choisir') +
-    '<input type="file" accept="application/pdf,image/*" multiple style="display:none" onchange="fichiersLigne(this,' + ci + ',' + li + ',\'preuve\')"></label>' +
-    (l.preuves && !l.preuve.length ? '<div class="meta">(une preuve est déjà rangée dans le dossier, mais l\'application ne peut pas la relire : choisissez le fichier sur cet appareil)</div>' : '');
+function piecesDe(l, g){ return (l.pieces || []).filter(function(p){ return p.genre === g; }); }
+function cellulePieces(l, ci, li){
+  if (l.etat === 'chargement') return '⏳ lecture des pièces du dossier…';
+  if (l.etat === 'recherche') return '⏳ recherche de la facture dans le mail…';
+  var ligne = function(g, libelle){
+    var ps = piecesDe(l, g);
+    return '<div>' + (ps.length ? '✅ ' + libelle + ' : ' + ps.map(function(p){ return '<a href="#" onclick="voirPiecePos(' + ci + ',' + li + ',\'' + esc(p.id) + '\');return false">👁 ' + esc(p.nom.replace(/^(PREUVE|FACTURE|DOCUMENT) \d{4}-\d{2}-\d{2} — /, '')) + '</a>'; }).join(', ')
+      : '<b style="color:var(--rouge)">✗ ' + libelle + ' manquante</b>') +
+      ' <label class="lienfic">ajouter<input type="file" accept="application/pdf,image/*" multiple style="display:none" onchange="fichiersLigne(this,' + ci + ',' + li + ',\'' + g + '\')"></label></div>';
+  };
+  return ligne('preuve', 'preuve de virement') + ligne('facture', 'facture') +
+    (piecesDe(l, 'document').length ? ligne('document', 'document') : '<div><label class="lienfic">＋ autre document<input type="file" accept="application/pdf,image/*" multiple style="display:none" onchange="fichiersLigne(this,' + ci + ',' + li + ',\'document\')"></label></div>');
 }
 function lireFichiers(liste, fin){
   var res = [], tous = Array.prototype.slice.call(liste);
@@ -887,57 +912,46 @@ function lireFichiers(liste, fin){
   };
   suite();
 }
-function fichiersLigne(input, ci, li, quoi){
-  var l = POS.comptes[ci].lignes[li];
-  lireFichiers(input.files || [], function(fs){
-    if (!fs.length) return;
-    if (quoi === 'preuve') l.preuve = fs; else l.fact = { etat: 'trouvée', fichiers: fs };
-    dessinerPosition();
-  });
-}
-/* La facture est retrouvée dans le mail (ou le courrier scanné) d'où vient le dossier. */
-function idSource(l){
-  var u = String(l.lien || ''), m = /thread-f:(\d+)/.exec(u);
-  if (m && window.BigInt) return BigInt(m[1]).toString(16);
-  m = /#[a-z]+\/([0-9a-f]{16})\b/.exec(u); if (m) return m[1];
-  var f = (FICHES || []).filter(function(g){ return g['Références'] && g['Références'] === l.refs; })[0];
-  return f ? f['ID'] : '';
-}
-function chercherFactures(){
-  var a_faire = [];
-  POS.comptes.forEach(function(c){ c.lignes.forEach(function(l){ if (l.fact.etat === 'à chercher') a_faire.push(l); }); });
+function ligneTreso(cle){ return ((TRESO && TRESO.lignes) || []).filter(function(y){ return y.cle === cle; })[0]; }
+function majLigne(l, r){ l.pieces = r.pieces; var x = ligneTreso(l.cle); if (x) majCompte(x, r); }
+/* Les pièces déjà rangées dans chaque dossier sont reprises ; la facture manquante est cherchée dans le mail d'origine. */
+function chargerPiecesPosition(){
+  var lignes = [];
+  POS.comptes.forEach(function(c){ c.lignes.forEach(function(l){ lignes.push(l); }); });
   var suite = function(){
-    if (!a_faire.length) return;
-    var l = a_faire.shift(), id = idSource(l);
-    var fini = function(etat, fichiers){ l.fact = { etat: etat, fichiers: fichiers || [] }; if (POS) dessinerPosition(); suite(); };
-    if (!id) return fini('introuvable automatiquement : choisissez le fichier');
-    l.fact.etat = 'recherche'; dessinerPosition();
-    if (/^C-/.test(id)) {
-      var pages = [], p = 0;
-      var page = function(){
-        appel('mob_scan', [JETON, id, p], function(r){ pages.push({ nom: 'courrier p' + (p + 1) + (/pdf/i.test(r.type) ? '.pdf' : '.jpg'), type: r.type, b64: r.b64 }); p++; if (p < r.pages && p < 12) page(); else fini('trouvée', pages); },
-          function(){ fini(pages.length ? 'trouvée' : 'introuvable : choisissez le fichier', pages); });
-      };
-      return page();
-    }
-    appel('mob_mail', [JETON, id], function(r){
-      var pjs = [];
-      r.messages.forEach(function(m){ m.pjs.forEach(function(p){
-        if ((/pdf/i.test(p.type) || /\.pdf$/i.test(p.nom)) && !/preuve|virement|rib|cgv|courrier.?proforma.?groupe/i.test(p.nom)) pjs.push(p);
-      }); });
-      if (!pjs.length) return fini('absente du mail : choisissez le fichier');
-      pjs = pjs.slice(-3);
-      var res = [];
-      var une = function(){
-        if (!pjs.length) return fini(res.length ? 'trouvée' : 'illisible : choisissez le fichier', res);
-        var p = pjs.shift();
-        appel('mob_pj', [JETON, id, p.mi, p.ai], function(f){ res.push({ nom: f.nom, type: f.type, b64: f.b64 }); une(); }, function(){ une(); });
-      };
-      une();
-    }, function(){ fini('introuvable : choisissez le fichier'); });
+    if (!lignes.length || !POS) return;
+    var l = lignes.shift();
+    var fin = function(){ l.etat = 'ok'; if (POS) dessinerPosition(); suite(); };
+    appel('mob_pieces', [JETON, l.cle], function(r){
+      majLigne(l, r);
+      if (r.compte.facture) return fin();
+      l.etat = 'recherche'; dessinerPosition();
+      appel('mob_facturesAuto', [JETON, l.cle], function(){
+        appel('mob_pieces', [JETON, l.cle], function(r2){ majLigne(l, r2); fin(); }, fin);
+      }, fin);
+    }, fin);
   };
   suite();
 }
+function fichiersLigne(input, ci, li, genre){
+  var l = POS.comptes[ci].lignes[li];
+  var fichiers = Array.prototype.slice.call(input.files || []); input.value = '';
+  lireFichiers(fichiers, function(fs){
+    var err = document.getElementById('pErr');
+    var suite = function(){
+      if (!fs.length) { l.etat = 'ok'; dessinerPosition(); return; }
+      if (err) err.textContent = 'Enregistrement du fichier dans le dossier…';
+      appel('mob_piece', [JETON, l.cle, genre, fs.shift()], function(r){ majLigne(l, r); suite(); }, function(m){ if (err) err.textContent = m; });
+    };
+    suite();
+  });
+}
+function voirPiecePos(ci, li, id){
+  var l = POS.comptes[ci].lignes[li], x = ligneTreso(l.cle);
+  if (x && !x.pieces) x.pieces = l.pieces;
+  voirPiece(id, l.cle, function(){ dessinerPosition(); });
+}
+function appelP(fn, args){ return new Promise(function(ok, ko){ appel(fn, args, ok, function(m){ ko(new Error(m)); }); }); }
 function chargerPdfLib(fin){
   if (window.PDFLib) return fin();
   var sc = document.createElement('script');
@@ -951,8 +965,8 @@ function dossierPDF(){
   var err = document.getElementById('pErr'); err.textContent = '';
   var manque = [];
   POS.comptes.forEach(function(c){ c.lignes.forEach(function(l){
-    if (!l.preuve.length) manque.push(intitule(l) + ' : ordre de virement');
-    if (l.fact.etat !== 'trouvée') manque.push(intitule(l) + ' : facture');
+    if (!piecesDe(l, 'preuve').length) manque.push(intitule(l) + ' : preuve de virement');
+    if (!piecesDe(l, 'facture').length) manque.push(intitule(l) + ' : facture');
   }); });
   if (manque.length && !confirm('Il manque :\n- ' + manque.join('\n- ') + '\n\nCréer le PDF quand même ?')) return;
   err.textContent = 'Assemblage du PDF…';
@@ -980,9 +994,11 @@ function dossierPDF(){
         pg.drawText(sansAccents(String(l.tiers).toUpperCase()), { x: 50, y: 705, size: 18, font: gras });
         (sansAccents(l.refs || '').match(/.{1,80}(\s|$)/g) || []).slice(0, 4).forEach(function(t, i){ pg.drawText(t.trim(), { x: 50, y: 680 - i * 16, size: 11, font: police }); });
         pg.drawText(sansAccents('Montant du virement : ' + eur(l.montant).replace(/\s/g, ' ')), { x: 50, y: 600, size: 14, font: gras });
-        pg.drawText(sansAccents('Pages suivantes : ordre de virement (' + (l.preuve.length || 'MANQUANT') + '), puis facture (' + (l.fact.etat === 'trouvée' ? l.fact.fichiers.length : 'MANQUANTE') + ').'), { x: 50, y: 570, size: 11, font: police });
-        for (var f of l.preuve) await ajouter(f, intitule(l) + ' - ordre de virement');
-        if (l.fact.etat === 'trouvée') for (var g of l.fact.fichiers) await ajouter(g, intitule(l) + ' - facture');
+        pg.drawText(sansAccents('Pages suivantes : preuve de virement (' + (piecesDe(l, 'preuve').length || 'MANQUANTE') + '), facture (' + (piecesDe(l, 'facture').length || 'MANQUANTE') + ')' + (piecesDe(l, 'document').length ? ', autres documents (' + piecesDe(l, 'document').length + ')' : '') + '.'), { x: 50, y: 570, size: 11, font: police });
+        for (var g of ['preuve', 'facture', 'document']) for (var p of piecesDe(l, g)) {
+          err.textContent = 'Assemblage du PDF… (' + l.tiers + ')';
+          try { await ajouter(await appelP('mob_fichier', [JETON, l.cle, p.id]), intitule(l) + ' - ' + g); } catch (e) { echecs.push(intitule(l) + ' - ' + g + ' (' + e.message + ')'); }
+        }
       }
       var octets = await doc.save();
       var a = document.createElement('a');
@@ -1069,7 +1085,7 @@ function sauverLigne(x){
   appel('mob_majVirement', [JETON, x.cle, x.choisi, x.montantVir, x.banqueVir, x.priorite, x.note], function(){},
     function(m){ alert('Non enregistré : ' + m); });
 }
-function cocher(i, v){ var x = TRESO.lignes[i]; x.choisi = v; if (v && x.montantVir == null) x.montantVir = x.du; sauverLigne(x); afficherTreso(); }
+function cocher(i, v){ var x = TRESO.lignes[i]; x.choisi = v; if (v && !(x.montantVir > 0)) x.montantVir = montantPos(x); sauverLigne(x); afficherTreso(); }
 function changer(i, champ, v){
   var x = TRESO.lignes[i];
   if (champ === 'montantVir') { var n = nb(v); if (n == null || n < 0) { afficherTreso(); return; } x.montantVir = n; } else x[champ] = v;
@@ -1104,6 +1120,7 @@ function dossier(i){
     (x.preuves !== undefined ? blocPreuve(x) : '') +
     '<button id="dOk" class="btn b-ok" style="width:100%;margin-top:8px" onclick="enregistrerDossier()">Enregistrer</button>';
   ouvrir();
+  if (x.source === 'Fichier RJ') { if (x.pieces) afficherPieces(x); chargerPieces(x); }
 }
 function recapVersements(x){
   var t = x.tiers + ' — ' + (x.refs || 'dossier') + ' : montant ' + eur(x.montantTTC) + '.';
@@ -1130,23 +1147,80 @@ function blocVersements(x){
     (x.versements.length ? '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="copierRecap()">📋 Copier le récapitulatif (pour un mail)</button>' : '') +
     '</div>';
 }
+/* ---------- Pièces du dossier : preuve de virement, facture, autres documents (rangées dans Drive) ---------- */
+var GENRES_PIECE = { preuve: '📨 Preuve de virement', facture: '🧾 Facture', document: '📄 Document' };
+function badgesPieces(x){
+  var b = function(n, ok, txt){ return '<span class="bpc ' + (ok ? 'bpc-ok' : 'bpc-non') + '">' + txt + (ok ? ' ✓' + (n > 1 ? ' ×' + n : '') : ' —') + '</span>'; };
+  return '<div class="badgesP">' + b(x.preuves || 0, x.preuves > 0, '📨 Preuve') + b(x.factures || 0, x.factures > 0, '🧾 Facture') +
+    (x.documents ? b(x.documents, true, '📄 Document') : '') + '</div>';
+}
 function blocPreuve(x){
-  return '<div class="carte" style="margin-top:12px;background:#f8f9fb"><b>📨 Preuve de virement et relance</b>' +
-    '<div class="meta">' + (x.preuves ? '✅ ' + x.preuves + ' preuve(s) jointe(s) à ce dossier (la plus récente est envoyée).' : 'Aucune preuve jointe pour l\'instant.') + '</div>' +
-    '<label class="btn b-voir" style="display:block;text-align:center;margin-top:8px;cursor:pointer">📎 Joindre la preuve (PDF ou photo)<input type="file" accept="application/pdf,image/*" style="display:none" onchange="joindrePreuve(this)"></label>' +
+  return '<div class="carte" style="margin-top:12px;background:#f8f9fb"><b>📎 Pièces du dossier</b>' +
+    '<div id="pcListe" class="meta">Chargement des pièces…</div>' +
+    '<div class="opts" style="margin-top:8px">' + ['preuve', 'facture', 'document'].map(function(g){
+      return '<label class="btn b-voir" style="flex:1;text-align:center;cursor:pointer;min-width:150px">＋ ' + GENRES_PIECE[g] +
+        '<input type="file" accept="application/pdf,image/*" multiple style="display:none" onchange="joindrePiece(this,\'' + g + '\')"></label>'; }).join('') + '</div>' +
+    '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="factureAuto()">🔎 Retrouver la facture dans le mail d\'origine</button>' +
     '<div id="pErr" class="erreur"></div>' +
-    '<div class="opts"><button class="btn b-ok" style="flex:1" onclick="preparerEnvoi(\'preuve\')"' + (x.preuves ? '' : ' disabled') + '>📨 Envoyer la preuve</button>' +
+    '<div class="opts"><button class="btn b-ok" style="flex:1" onclick="preparerEnvoi(\'preuve\')">📨 Envoyer la preuve au laboratoire</button>' +
     '<button class="btn b-corr" style="flex:1" onclick="preparerEnvoi(\'relance\')">🔔 Relancer (non reçu)</button></div>' +
     '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="positionAdmin([TRESO.lignes[DOSSIER].cle])">🏛 Pour l\'administrateur : position bancaire + preuve + facture</button></div>';
 }
-function joindrePreuve(input){
-  var f = input.files && input.files[0]; input.value = ''; if (!f) return;
-  var x = TRESO.lignes[DOSSIER], err = document.getElementById('pErr'); err.textContent = 'Envoi de la preuve…';
-  var envoyer = function(p){
-    appel('mob_preuve', [JETON, x.cle, p], function(r){ x.preuves = r.nb; dossier(DOSSIER); }, function(m){ err.textContent = m; });
-  };
-  if (/pdf/i.test(f.type)) { var l = new FileReader(); l.onload = function(){ envoyer({ nom: f.name, type: 'application/pdf', b64: String(l.result).split(',')[1] }); }; l.readAsDataURL(f); }
-  else reduireImage(f, function(p){ envoyer({ nom: p.nom, type: p.type, b64: p.b64 }); });
+function majCompte(x, r){ x.preuves = r.compte.preuve; x.factures = r.compte.facture; x.documents = r.compte.document; x.pieces = r.pieces; }
+function afficherPieces(x){
+  var z = document.getElementById('pcListe'); if (!z) return;
+  var l = x.pieces || [];
+  z.innerHTML = badgesPieces(x) + (l.length ? l.map(function(p){
+    return '<div class="ligne1" style="margin-top:6px;align-items:center"><span>' + GENRES_PIECE[p.genre] + ' · <span class="meta">' + esc(p.nom) + '</span></span>' +
+      '<span style="white-space:nowrap"><button class="pj" onclick="voirPiece(\'' + esc(p.id) + '\')">👁 Voir</button> ' +
+      '<a href="#" onclick="retirerPiece(\'' + esc(p.id) + '\');return false">retirer</a></span></div>';
+  }).join('') : '<div class="meta" style="margin-top:6px">Aucune pièce pour l\'instant.</div>');
+}
+function chargerPieces(x){
+  appel('mob_pieces', [JETON, x.cle], function(r){ majCompte(x, r); afficherPieces(x); },
+    function(m){ var z = document.getElementById('pcListe'); if (z) z.textContent = 'Pièces non chargées : ' + m; });
+}
+function joindrePiece(input, genre){
+  var x = TRESO.lignes[DOSSIER], err = document.getElementById('pErr');
+  var fichiers = Array.prototype.slice.call(input.files || []); input.value = '';
+  if (!fichiers.length) return;
+  err.textContent = 'Envoi du fichier…';
+  lireFichiers(fichiers, function(fs){
+    var suite = function(){
+      if (!fs.length) { err.innerHTML = '<span class="pos">✓ Enregistré dans le dossier.</span>'; return; }
+      appel('mob_piece', [JETON, x.cle, genre, fs.shift()], function(r){ majCompte(x, r); afficherPieces(x); suite(); }, function(m){ err.textContent = m; });
+    };
+    suite();
+  });
+}
+function joindrePreuve(input){ joindrePiece(input, 'preuve'); }
+function retirerPiece(id){
+  if (!confirm('Retirer ce fichier du dossier ? (il reste conservé dans Google Drive)')) return;
+  var x = TRESO.lignes[DOSSIER];
+  appel('mob_retirerPiece', [JETON, x.cle, id], function(r){ majCompte(x, r); afficherPieces(x); }, function(m){ alert(m); });
+}
+function factureAuto(){
+  var x = TRESO.lignes[DOSSIER], err = document.getElementById('pErr'); err.textContent = 'Recherche de la facture…';
+  appel('mob_facturesAuto', [JETON, x.cle], function(r){
+    err.innerHTML = r.trouvees.length ? '<span class="pos">✓ Facture retrouvée et rangée dans le dossier.</span>'
+      : (x.factures ? 'Ce dossier a déjà une facture.' : 'Pas de facture trouvée dans le mail d\'origine : ajoutez-la avec « ＋ 🧾 Facture ».');
+    chargerPieces(x);
+  }, function(m){ err.textContent = m; });
+}
+/* Visionneuse : affiche une pièce en grand pour vérifier son contenu. */
+var RETOUR_PIECE = null;
+function voirPiece(id, cle, retour){
+  var x = cle ? TRESO.lignes.filter(function(y){ return y.cle === cle; })[0] : TRESO.lignes[DOSSIER];
+  RETOUR_PIECE = retour || function(){ dossier(TRESO.lignes.indexOf(x)); };
+  var p = (x.pieces || []).filter(function(q){ return q.id === id; })[0] || { nom: '', genre: 'document' };
+  document.getElementById('mTitre').textContent = GENRES_PIECE[p.genre] + ' — ' + x.tiers;
+  document.getElementById('mCorps').innerHTML = '<button class="btn b-voir" onclick="RETOUR_PIECE()">← Retour</button> <span class="meta">' + esc(p.nom) + '</span><div id="pjZone" class="chargement">Chargement du document…</div>';
+  ouvrir();
+  appel('mob_fichier', [JETON, x.cle, id], function(f){
+    var zone = document.getElementById('pjZone'); zone.className = '';
+    if (/pdf/i.test(f.type)) afficherPDF(octetsB64(f.b64), zone);
+    else zone.innerHTML = '<img style="max-width:100%;border:1px solid var(--bord)" src="data:' + esc(f.type) + ';base64,' + f.b64 + '">';
+  }, function(m){ document.getElementById('pjZone').innerHTML = '<div class="erreur">' + esc(m) + '</div>'; });
 }
 var ENVOI = null;
 function preparerEnvoi(type){
@@ -1398,7 +1472,7 @@ function voirCourrier(id, page){
 }
 
 function ouvrir(){ document.getElementById('modal').style.display = 'block'; }
-function fermer(){ document.getElementById('modal').style.display = 'none'; }
+function fermer(){ document.getElementById('modal').style.display = 'none'; if (TRESO && document.getElementById('vRJ').style.display !== 'none') afficherTreso(); }
 </script>
 </body>
 </html>
