@@ -671,6 +671,7 @@ function dossier(i){
     (x.contacts ? '<div class="meta" style="white-space:pre-wrap">' + esc(x.contacts) + '</div>' : '') +
     '<div id="dErr" class="erreur"></div>' +
     (x.versements ? blocVersements(x) : '') +
+    (x.preuves !== undefined ? blocPreuve(x) : '') +
     '<button id="dOk" class="btn b-ok" style="width:100%;margin-top:8px" onclick="enregistrerDossier()">Enregistrer</button>';
   ouvrir();
 }
@@ -697,6 +698,61 @@ function blocVersements(x){
     (x.versements.length ? '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="copierRecap()">📋 Copier le récapitulatif (pour un mail)</button>' : '') +
     '</div>';
 }
+function blocPreuve(x){
+  return '<div class="carte" style="margin-top:12px;background:#f8f9fb"><b>📨 Preuve de virement et relance</b>' +
+    '<div class="meta">' + (x.preuves ? '✅ ' + x.preuves + ' preuve(s) jointe(s) à ce dossier (la plus récente est envoyée).' : 'Aucune preuve jointe pour l\'instant.') + '</div>' +
+    '<label class="btn b-voir" style="display:block;text-align:center;margin-top:8px;cursor:pointer">📎 Joindre la preuve (PDF ou photo)<input type="file" accept="application/pdf,image/*" style="display:none" onchange="joindrePreuve(this)"></label>' +
+    '<div id="pErr" class="erreur"></div>' +
+    '<div class="opts"><button class="btn b-ok" style="flex:1" onclick="preparerEnvoi(\'preuve\')"' + (x.preuves ? '' : ' disabled') + '>📨 Envoyer la preuve</button>' +
+    '<button class="btn b-corr" style="flex:1" onclick="preparerEnvoi(\'relance\')">🔔 Relancer (non reçu)</button></div></div>';
+}
+function joindrePreuve(input){
+  var f = input.files && input.files[0]; input.value = ''; if (!f) return;
+  var x = TRESO.lignes[DOSSIER], err = document.getElementById('pErr'); err.textContent = 'Envoi de la preuve…';
+  var envoyer = function(p){
+    appel('mob_preuve', [JETON, x.cle, p], function(r){ x.preuves = r.nb; dossier(DOSSIER); }, function(m){ err.textContent = m; });
+  };
+  if (/pdf/i.test(f.type)) { var l = new FileReader(); l.onload = function(){ envoyer({ nom: f.name, type: 'application/pdf', b64: String(l.result).split(',')[1] }); }; l.readAsDataURL(f); }
+  else reduireImage(f, function(p){ envoyer({ nom: p.nom, type: p.type, b64: p.b64 }); });
+}
+var ENVOI = null;
+function preparerEnvoi(type){
+  var x = TRESO.lignes[DOSSIER];
+  document.getElementById('mCorps').innerHTML = '<div class="chargement">Préparation du mail…</div>';
+  appel('mob_infosEnvoi', [JETON, x.cle, type], function(r){
+    ENVOI = { type: type, a: r.a, o: r.objet, t: r.texte, pj: r.preuves > 0 };
+    document.getElementById('mTitre').textContent = (type === 'preuve' ? 'Preuve de virement — ' : 'Relance — ') + x.tiers;
+    document.getElementById('mCorps').innerHTML =
+      '<div class="champ"><label>À</label><input id="eA" value="' + esc(r.a) + '" placeholder="adresse du laboratoire"></div>' +
+      (r.a ? '' : '<div class="meta">Aucune adresse dans la fiche « Notes laboratoires » de ce tiers : saisissez-la.</div>') +
+      '<div class="champ"><label>Objet</label><input id="eO" value="' + esc(r.objet) + '"></div>' +
+      '<div class="champ"><label>Message</label><textarea id="eT" rows="9">' + esc(r.texte) + '</textarea></div>' +
+      '<label style="display:block;margin:6px 0"><input type="checkbox" id="eP"' + (r.preuves ? ' checked' : ' disabled') + '> Joindre la preuve de virement' + (r.preuves ? '' : ' (aucune jointe)') + '</label>' +
+      '<p class="meta">Votre signature est ajoutée automatiquement.' + (type === 'preuve' ? ' S\'il ne reste rien à payer, le dossier sera clôturé.' : ' La relance sera notée dans les commentaires du dossier.') + '</p>' +
+      '<div id="eErr" class="erreur"></div>' +
+      '<div class="actions"><button class="btn b-voir" onclick="dossier(DOSSIER)">← Retour</button><button class="btn b-ok" onclick="verifierEnvoiDossier()">Vérifier avant d\'envoyer</button></div>';
+  }, function(m){ document.getElementById('mCorps').innerHTML = '<div class="erreur">' + esc(m) + '</div><button class="btn b-voir" onclick="dossier(DOSSIER)">← Retour</button>'; });
+}
+function verifierEnvoiDossier(){
+  ENVOI.a = document.getElementById('eA').value.trim(); ENVOI.o = document.getElementById('eO').value; ENVOI.t = document.getElementById('eT').value; ENVOI.pj = document.getElementById('eP').checked;
+  var err = document.getElementById('eErr');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ENVOI.a.split(/[;,]/)[0].trim())) { err.textContent = 'Adresse du destinataire invalide.'; return; }
+  if (!ENVOI.t.trim()) { err.textContent = 'Le message est vide.'; return; }
+  document.getElementById('mCorps').innerHTML =
+    '<div class="meta">À : <b>' + esc(ENVOI.a) + '</b></div><div class="meta">Objet : ' + esc(ENVOI.o) + '</div>' +
+    '<div class="meta">Pièce jointe : <b>' + (ENVOI.pj ? 'preuve de virement' : 'aucune') + '</b></div>' +
+    '<pre style="white-space:pre-wrap;background:#f8f9fb;padding:10px;border-radius:8px">' + esc(ENVOI.t) + '</pre>' +
+    '<div id="eErr" class="erreur"></div>' +
+    '<div class="actions"><button class="btn b-voir" onclick="preparerEnvoi(ENVOI.type)">✎ Modifier</button><button id="eOk" class="btn b-ok" onclick="envoyerDossier()">✉️ Envoyer maintenant</button></div>';
+}
+function envoyerDossier(){
+  var x = TRESO.lignes[DOSSIER], b = document.getElementById('eOk'); b.disabled = true; b.textContent = 'Envoi…';
+  appel('mob_envoiDossier', [JETON, x.cle, ENVOI.type, ENVOI.a, ENVOI.o, ENVOI.t, ENVOI.pj], function(r){
+    document.getElementById('mCorps').innerHTML = '<p>✅ ' + esc(r.note) + '.</p>' + (r.cloture ? '<p>Le dossier est clôturé (rien ne reste à payer).</p>' : '') +
+      '<button class="btn b-voir" style="width:100%" onclick="fermer();chargerTreso()">Fermer</button>';
+  }, function(m){ document.getElementById('eErr').textContent = m; b.disabled = false; b.textContent = '✉️ Réessayer'; });
+}
+
 function ajouterVersement(){
   var x = TRESO.lignes[DOSSIER], err = document.getElementById('vErr'), b = document.getElementById('vOk');
   var m = nb(document.getElementById('vM').value), d = document.getElementById('vD').value;
