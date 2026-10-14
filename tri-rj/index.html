@@ -97,6 +97,7 @@
   table.rj td,table.rj th{border-bottom:1px solid var(--bord);padding:6px;text-align:left;vertical-align:top}
 .zonecolle{margin-top:8px;padding:14px;border:2px dashed #9aa5b1;border-radius:10px;text-align:center;color:#5f6b7a;font-size:14px;min-height:22px;outline:none;-webkit-user-select:text;user-select:text}
 .zonecolle:focus{border-color:#1a73e8;color:#1a73e8}
+.doublon{margin:8px 0;padding:8px 10px;border-radius:8px;background:#fdecea;color:#8a1c12;font-size:13px;line-height:1.45}
 </style>
 </head>
 <body>
@@ -242,7 +243,60 @@ function charger(){
     FICHES = r.fiches; DECISIONS = r.decisions;
     FICHES.sort(function(a,b){ return rang(a) - rang(b) || String(b['Date mail']).localeCompare(String(a['Date mail'])); });
     afficher();
+    // le suivi RJ sert aussi à repérer les doublons (relance d'une facture déjà comptée)
+    if (!TRESO) appel('mob_tresorerie', [JETON], function(t){ TRESO = t; afficher(); }, function(){});
   });
+}
+
+/* ---------- Doublons : une relance ou un renvoi d'une facture déjà comptée ---------- */
+function refsDe(texte){
+  var t = String(texte || '').toUpperCase().match(/[A-Z0-9][A-Z0-9-]{4,}/g) || [];
+  return t.filter(function(x){ return (x.match(/\d/g) || []).length >= 5; })
+    .map(function(x){ return x.replace(/^0+/, ''); })
+    .filter(function(x, i, a){ return x.length >= 5 && a.indexOf(x) === i; });
+}
+var CODES_ = null, CODES_N = -1;
+function codesClients(){
+  if (CODES_ && CODES_N === FICHES.length) return Object.assign({}, CODES_);
+  var c = {}, re = /(?:client|compte|code|cc)(?:[^A-Za-z0-9]{1,6}(?:client|compte|n°|no|numéro|num))*[^A-Za-z0-9]{0,8}([A-Z0-9][A-Z0-9-]{4,}(?:\s*[–\/-]\s*[A-Z0-9][A-Z0-9-]{4,})?)/gi, m;
+  var textes = FICHES.map(function(g){ return [g['Références'], g['Objet'], g['Résumé'], g['Note de Claude'], g['Tiers']].join(' \n '); });
+  ((TRESO && TRESO.lignes) || []).forEach(function(l){ textes.push(l.refs + ' \n ' + (l.commentaire || '')); });
+  textes.forEach(function(t){ while ((m = re.exec(t))) refsDe(m[1]).forEach(function(r){ c[r] = 1; }); });
+  CODES_ = c; CODES_N = FICHES.length;
+  return Object.assign({}, c);
+}
+function tiersProche(a, b){
+  var n = function(x){ return String(x || '').toUpperCase().normalize('NFD').replace(/[^A-Z]/g, ''); };
+  a = n(a); b = n(b);
+  return !!a && !!b && (a.indexOf(b.slice(0, 5)) >= 0 || b.indexOf(a.slice(0, 5)) >= 0);
+}
+function doublons(f){
+  var sources = [];
+  ((TRESO && TRESO.lignes) || []).forEach(function(l){
+    sources.push({ quoi: 'au suivi RJ : ' + l.tiers + ' — ' + l.refs + (l.montantTTC != null ? ' (' + eur(l.montantTTC) + ')' : ''), tiers: l.tiers, refs: l.refs, montant: l.montantTTC, suivi: true });
+  });
+  FICHES.forEach(function(g){
+    if (g === f) return;
+    if (String(g['Date mail']) > String(f['Date mail'])) return;   // la pièce la plus ancienne reste la référence ; la relance est le doublon
+    if (g['Statut'] !== 'À valider' && ['Suivi RJ', 'Déjà au suivi RJ'].indexOf(g['Décision finale']) < 0) return;   // fiche traitée sans inscription : rien de compté
+    sources.push({ quoi: 'fiche du ' + g['Date mail'] + ' : ' + g['Tiers'] + ' — ' + g['Type'] + (g['Statut'] !== 'À valider' ? ' (' + g['Statut'] + ')' : ''), tiers: g['Tiers'], refs: g['Références'] + ' ' + g['Objet'], montant: nb(g['Montant TTC']), suivi: false });
+  });
+  // un n° de client ou de compte est commun à toutes les factures d'un labo : il ne prouve rien
+  var codes = codesClients();
+  refsDe(f['Tiers']).forEach(function(r){ codes[r] = 1; });
+  var sansCodes = function(t){ return refsDe(t).filter(function(r){ return !codes[r]; }); };
+  var mesRefs = sansCodes(f['Références'] + ' ' + f['Objet']);
+  var monMontant = nb(f['Montant TTC']);
+  var res = [];
+  sources.forEach(function(s){
+    var leurs = sansCodes(s.refs).filter(function(r){ return refsDe(s.tiers).indexOf(r) < 0; });
+    var communes = leurs.filter(function(r){ return mesRefs.indexOf(r) >= 0; });
+    // deux pièces qui partagent un numéro mais ont chacune leur propre n° de facture : ce sont deux factures différentes
+    if (communes.length && mesRefs.some(function(r){ return communes.indexOf(r) < 0; }) && leurs.some(function(r){ return communes.indexOf(r) < 0; })) communes = [];
+    var memeMontant = monMontant != null && s.montant != null && monMontant === s.montant && tiersProche(f['Tiers'], s.tiers);
+    if (communes.length || memeMontant) res.push({ quoi: s.quoi, suivi: s.suivi, pourquoi: communes.length ? 'même référence ' + communes.join(', ') : 'même montant ' + eur(monMontant) });
+  });
+  return res;
 }
 
 function vue(v){
@@ -285,6 +339,8 @@ function carte(f){
       (f['Déjà fait'] ? '<p><b>Déjà fait :</b> ' + esc(f['Déjà fait']) + '</p>' : '') +
       '<p><b>Antériorité :</b> ' + esc(f['Antériorité']) + (f['Date pièce'] ? ' · pièce du ' + esc(f['Date pièce']) : '') + '</p></details>' +
     (f['Incertitudes'] ? '<div class="incert">⚠️ ' + esc(f['Incertitudes']) + '</div>' : '') +
+    (!traite && (function(){ var d = doublons(f); return d.length ? '<div class="doublon">♊ <b>Doublon possible</b> — ' + (d.some(function(x){ return x.suivi; }) ? 'déjà compté au suivi RJ, ne pas l\'ajouter une 2e fois' : 'même pièce qu\'une autre fiche : n\'en valider qu\'une') + ' :<br>' +
+      d.slice(0, 4).map(function(x){ return '• ' + esc(x.quoi) + ' <span class="meta">(' + esc(x.pourquoi) + ')</span>'; }).join('<br>') + '</div>' : ''; })() || '') +
     (f['Réponse envoyée'] ? (/^⏰/.test(f['Réponse envoyée'])
         ? '<div class="meta">' + esc(f['Réponse envoyée']) + ' <a href="#" onclick="annulerEnvoi(\'' + id + '\');return false">annuler l\'envoi</a></div>'
         : '<div class="meta">✉️ Réponse : ' + esc(f['Réponse envoyée']) + '</div>') : '') +
@@ -313,6 +369,11 @@ function priorite(id, n){
 function trouver(id){ return FICHES.filter(function(f){ return f['ID'] === id; })[0]; }
 
 function decider(id, statut, decision, etiquette, commentaire){
+  var fd = trouver(id);
+  if (fd && statut === 'Validé' && (decision || fd['Décision proposée']) === 'Suivi RJ') {
+    var dd = doublons(fd).filter(function(x){ return x.suivi; });
+    if (dd.length && !confirm('Attention : cette pièce semble déjà comptée ' + dd[0].quoi + ' (' + dd[0].pourquoi + ').\n\nL\'ajouter quand même au suivi RJ ?')) return;
+  }
   appel('mob_decider', [JETON, id, statut, decision || '', etiquette || '', commentaire || ''], function(r){
     var f = trouver(id);
     f['Statut'] = r.statut; f['Décision finale'] = r.finale; f['Étiquette finale'] = r.etiquette;
