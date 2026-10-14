@@ -736,6 +736,7 @@ function facturesManquantes(force){
   if (!TRESO.lignes.some(function(x){ return x.source === 'Fichier RJ' && !x.factures; })) { FACT_AUTO.fait = true; return; }
   FACT_AUTO.fait = true; FACT_AUTO.enCours = true; FACT_AUTO.msg = '⏳ Recherche des factures manquantes dans les mails…'; afficherTreso();
   appel('mob_facturesAuto', [JETON], function(r){
+    r = r || {}; r.trouvees = r.trouvees || []; r.sansFacture = r.sansFacture || [];
     FACT_AUTO.enCours = false;
     FACT_AUTO.msg = (r.trouvees.length ? '✅ ' + r.trouvees.length + ' facture(s) retrouvée(s) et rangée(s) dans les dossiers.' : 'Aucune nouvelle facture trouvée dans les mails.') +
       (r.sansFacture.length ? ' Sans facture : ' + r.sansFacture.length + ' dossier(s) — ajoutez-la dans le dossier (＋ 🧾 Facture).' : '');
@@ -1202,6 +1203,7 @@ function retirerPiece(id){
 function factureAuto(){
   var x = TRESO.lignes[DOSSIER], err = document.getElementById('pErr'); err.textContent = 'Recherche de la facture…';
   appel('mob_facturesAuto', [JETON, x.cle], function(r){
+    r = r || {}; r.trouvees = r.trouvees || [];
     err.innerHTML = r.trouvees.length ? '<span class="pos">✓ Facture retrouvée et rangée dans le dossier.</span>'
       : (x.factures ? 'Ce dossier a déjà une facture.' : 'Pas de facture trouvée dans le mail d\'origine : ajoutez-la avec « ＋ 🧾 Facture ».');
     chargerPieces(x);
