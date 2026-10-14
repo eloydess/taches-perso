@@ -23,7 +23,33 @@
   .onglets button.actif{background:#fff;color:var(--bleu)}
   .bandeau{background:var(--jaune);color:#7a4a00;font-size:13px;padding:6px 14px}
   main{padding:12px;max-width:760px;margin:0 auto}
-  @media (min-width:1000px){
+  @media (min-width:1100px){
+    main{max-width:1600px !important;padding:12px 20px}
+    header h1,.onglets{max-width:1600px !important}
+    #liste{display:grid !important;grid-template-columns:minmax(380px,34%) 1fr;gap:16px;align-items:start}
+    .maitre{position:sticky;top:8px;max-height:calc(100vh - 150px);display:flex;flex-direction:column;background:var(--carte);border:1px solid var(--bord);border-radius:12px;overflow:hidden}
+    .barrePC{padding:10px;border-bottom:1px solid var(--bord)}
+    .barrePC input{width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--bord);border-radius:8px;font-size:14px}
+    .raccourcis{font-size:12px;margin-top:6px} kbd{border:1px solid var(--bord);border-bottom-width:2px;border-radius:4px;padding:0 4px;font-size:11px;background:#f9fafb;margin-right:2px}
+    .lignes{overflow-y:auto}
+    .lignePC{padding:9px 12px;border-bottom:1px solid #eef0f3;cursor:pointer;border-left:4px solid transparent}
+    .lignePC:hover{background:#f5f8ff}
+    .lignePC.sel{background:#e8f0fe;border-left-color:var(--bleu)}
+    .lp1{display:flex;align-items:center;gap:4px}
+    .lp1 .tiers{font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .lp1 .montant{font-size:13px}
+    .lignePC .meta{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .detail{position:sticky;top:8px;max-height:calc(100vh - 150px);overflow-y:auto}
+    .detail .carte{padding:18px 22px;font-size:15px}
+    .detail .tiers{font-size:20px}
+    .detail details{display:block} .detail details[open] summary{margin-bottom:4px}
+    #treso{display:grid;grid-template-columns:400px 1fr;gap:16px;align-items:start}
+    .rjResume{position:sticky;top:8px}
+    .rjListe{display:grid;grid-template-columns:1fr;gap:10px;align-content:start}
+    .rjListe .carte{margin-bottom:0}
+  }
+  @media (min-width:1500px){ .rjListe{grid-template-columns:1fr 1fr} }
+  @media (min-width:1000px) and (max-width:1099px){
     main{max-width:1280px}
     header h1,.onglets{max-width:1280px;margin-left:auto;margin-right:auto}
     #liste{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
@@ -317,9 +343,59 @@ function afficher(){
     return '<button class="' + (c === FILTRE ? 'actif' : '') + '" onclick="FILTRE=\'' + c + '\';afficher()">' + c + ' (' + nb(c) + ')</button>';
   }).join('');
   var l = FICHES.filter(function(f){ return FILTRE === 'Traités' ? f['Statut'] !== 'À valider' : f['Statut'] === FILTRE; });
-  if (!l.length) { document.getElementById('liste').innerHTML = '<div class="vide">' + (FILTRE === 'À valider' ? '✅ Tout est traité pour ce lot.' : 'Aucune fiche traitée.') + '</div>'; return; }
-  document.getElementById('liste').innerHTML = l.map(carte).join('');
+  if (ECRAN_PC && RECHERCHE) {
+    var q = RECHERCHE.toLowerCase();
+    l = l.filter(function(f){ return [f['Tiers'], f['Références'], f['Objet'], f['Type'], f['Montant TTC'], f['Note de Claude']].join(' ').toLowerCase().indexOf(q) >= 0; });
+  }
+  VISIBLES = l;
+  if (!l.length) { document.getElementById('liste').innerHTML = (ECRAN_PC ? barrePC() : '') + '<div class="vide">' + (RECHERCHE ? 'Aucune fiche ne correspond à « ' + esc(RECHERCHE) + ' ».' : FILTRE === 'À valider' ? '✅ Tout est traité pour ce lot.' : 'Aucune fiche traitée.') + '</div>'; return; }
+  if (!ECRAN_PC) { document.getElementById('liste').innerHTML = l.map(carte).join(''); return; }
+  var pos = l.map(function(f){ return f['ID']; }).indexOf(SEL);
+  if (pos < 0) { pos = Math.min(POS_SEL, l.length - 1); SEL = l[pos]['ID']; }   // après une décision : la fiche suivante
+  POS_SEL = pos;
+  document.getElementById('liste').innerHTML = '<div class="maitre">' + barrePC() + '<div class="lignes">' + l.map(lignePC).join('') + '</div></div>' +
+    '<div class="detail" id="detail">' + carte(trouver(SEL)) + '</div>';
+  var actif = document.querySelector('.lignePC.sel'); if (actif && actif.scrollIntoViewIfNeeded) actif.scrollIntoViewIfNeeded(false);
 }
+
+/* ---------- Version ordinateur : liste à gauche, fiche à droite, raccourcis clavier ---------- */
+var ECRAN_PC = window.matchMedia('(min-width:1100px)').matches, SEL = null, POS_SEL = 0, RECHERCHE = '', VISIBLES = [];
+window.matchMedia('(min-width:1100px)').addEventListener('change', function(e){
+  ECRAN_PC = e.matches; document.body.classList.toggle('pc', ECRAN_PC);
+  if (FICHES) afficher(); if (TRESO && document.getElementById('vRJ').style.display !== 'none') afficherTreso();
+});
+document.addEventListener('DOMContentLoaded', function(){ document.body.classList.toggle('pc', ECRAN_PC); });
+document.body && document.body.classList.toggle('pc', ECRAN_PC);
+function barrePC(){
+  return '<div class="barrePC"><input id="recherche" type="search" placeholder="🔎 Rechercher (labo, n° de facture, montant…)" value="' + esc(RECHERCHE) + '" oninput="RECHERCHE=this.value;afficher();var r=document.getElementById(\'recherche\');r.focus();r.setSelectionRange(r.value.length,r.value.length)">' +
+    '<div class="meta raccourcis">Clavier : <kbd>↑</kbd><kbd>↓</kbd> naviguer · <kbd>A</kbd> d\'accord · <kbd>C</kbd> changer · <kbd>M</kbd> voir le mail · <kbd>R</kbd> répondre · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> priorité</div></div>';
+}
+function lignePC(f){
+  var d = f['Statut'] === 'À valider' ? doublons(f) : [];
+  return '<div class="lignePC' + (f['ID'] === SEL ? ' sel' : '') + '" onclick="choisir(\'' + esc(f['ID']) + '\')">' +
+    '<div class="lp1">' + (f['Priorité Pierre'] ? '<span class="badge pp-b">N° ' + esc(f['Priorité Pierre']) + '</span>' : '') +
+      '<span class="badge p-' + esc(f['Priorité']) + '">' + esc(f['Priorité']) + '</span>' +
+      '<span class="tiers">' + esc(f['Tiers']) + '</span>' + (d.length ? ' <span title="Doublon possible">♊</span>' : '') +
+      '<span class="montant">' + esc(String(f['Montant TTC'] || '').replace(/\s*\[ILLISIBLE\]/, '').replace('(dans la pièce jointe)', '📎 PDF')) + '</span></div>' +
+    '<div class="meta">' + esc(f['Type']) + ' · ' + esc(f['Date mail']) + ' · ' + esc(lib(f['Décision proposée'] || '')).replace(/<[^>]+>/g, '') +
+      (f['Statut'] !== 'À valider' ? ' · <b>' + esc(f['Statut']) + '</b>' : '') + '</div></div>';
+}
+function choisir(id){ SEL = id; afficher(); }
+document.addEventListener('keydown', function(e){
+  if (!ECRAN_PC || document.getElementById('vMail').style.display === 'none') return;
+  if (document.getElementById('modal').style.display === 'block') { if (e.key === 'Escape') fermer(); return; }
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable || e.ctrlKey || e.metaKey || e.altKey) return;
+  var i = VISIBLES.map(function(f){ return f['ID']; }).indexOf(SEL), f = trouver(SEL), k = e.key.toLowerCase();
+  if (k === 'arrowdown' || k === 'j') { if (i < VISIBLES.length - 1) choisir(VISIBLES[i + 1]['ID']); e.preventDefault(); }
+  else if (k === 'arrowup' || k === 'k') { if (i > 0) choisir(VISIBLES[i - 1]['ID']); e.preventDefault(); }
+  else if (!f) return;
+  else if (k === 'a' && f['Statut'] === 'À valider') decider(SEL, 'Validé');
+  else if (k === 'c' && f['Statut'] === 'À valider') corriger(SEL);
+  else if (k === 'm') voirMail(SEL);
+  else if (k === 'r') repondre(SEL);
+  else if (/^[123]$/.test(k) && f['Statut'] === 'À valider') priorite(SEL, k);
+  else if (k === '/') { var r = document.getElementById('recherche'); if (r) { r.focus(); e.preventDefault(); } }
+});
 
 function carte(f){
   var id = esc(f['ID']);
@@ -653,7 +729,7 @@ function totauxTreso(){
 
 function afficherTreso(){
   var t = totauxTreso();
-  var h = '<div class="carte"><b>🏦 Soldes disponibles</b>' +
+  var h = '<div class="rjResume"><div class="carte"><b>🏦 Soldes disponibles</b>' +
     ['CEBPL', 'BPGO'].map(function(b){
       var s = TRESO.soldes[b];
       var reste = s && s.montant != null ? s.montant - (t.parBanque[b] || 0) : null;
@@ -676,7 +752,8 @@ function afficherTreso(){
     (t.sansMontant ? '<span class="meta" style="grid-column:1/3">+ ' + t.sansMontant + ' sans montant connu (en attente de facture)</span>' : '') +
     '<span>✅ Je vire maintenant (' + t.nVir + ')</span><b class="pos">' + eur(t.vir) + '</b>' +
     '<span>Reste dû après ces virements</span><b>' + eur(t.du - t.vir) + '</b>' +
-    '</div><p class="meta" style="margin-bottom:0">Cochez les factures que vous voulez virer maintenant ; vous pouvez changer le montant (virement partiel) et la banque. Rien n\'est viré par l\'application.</p></div>';
+    '</div><p class="meta" style="margin-bottom:0">Cochez les factures que vous voulez virer maintenant ; vous pouvez changer le montant (virement partiel) et la banque. Rien n\'est viré par l\'application.</p></div>' +
+    (ECRAN_PC ? '<p class="meta raccourcis">Astuce : cochez les factures à droite ; le total se met à jour ici.</p>' : '') + '</div><div class="rjListe">';
   var ordre = { '1': 0, '2': 1, '3': 2, '': 3 };
   var l = TRESO.lignes.slice().sort(function(a, b){ return (b.choisi - a.choisi) || (ordre[a.priorite] - ordre[b.priorite]) || ((b.du || 0) - (a.du || 0)); });
   h += l.map(function(x){
@@ -697,7 +774,7 @@ function afficherTreso(){
       '</div></div></div>';
   }).join('');
   if (TRESO.clotures) h += '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="archiver()">📦 Ranger ' + TRESO.clotures + ' dossier(s) clôturé(s) dans les archives</button>';
-  h += '<p class="meta">Source : ' + esc(TRESO.source) + '. Mis à jour : ' + esc(TRESO.maj) + '.</p>';
+  h += '<p class="meta">Source : ' + esc(TRESO.source) + '. Mis à jour : ' + esc(TRESO.maj) + '.</p></div>';
   document.getElementById('treso').innerHTML = h;
 }
 
