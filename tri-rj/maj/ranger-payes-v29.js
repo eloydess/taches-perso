@@ -18,7 +18,7 @@ function rp_numeros_(refs) {
   propre.split(/[;\/,\n]| et /i).forEach(function (seg) {
     (seg.match(/[A-Z0-9][A-Z0-9\-]{5,}/gi) || []).forEach(function (t) {
       t = t.replace(/^-+|-+$/g, '');
-      if (/^20\d{2}(0[1-9]|1[0-2])\d{2}$/.test(t)) return;   // une date (aaaammjj), pas un numéro de pièce
+      if (/^20\d{2}(0[1-9]|1[0-2])\d{2}$/.test(t) || /^\d{2}-\d{2}-\d{4}$/.test(t)) return;   // une date, pas un numéro de pièce
       if (t.length >= 6 && (t.match(/\d/g) || []).length >= 4 && res.indexOf(t) < 0) res.push(t);
     });
   });
@@ -33,7 +33,7 @@ function rp_filDepuisLien_(lien) {
 /** Étiquette du dossier : celle d'une fiche rattachée si elle existe dans Gmail, sinon devinée parmi les étiquettes existantes. */
 function rp_etiquette_(tiers, proposee) {
   var noms = rg_etiquettes_().map(function (e) { return e.nom; });
-  if (proposee && noms.indexOf(proposee) >= 0) return proposee;
+  if (proposee && noms.indexOf(proposee) >= 0 && /^(LABORATOIRES|PRESTATAIRES)\//.test(proposee)) return proposee;   // jamais AA PAYE / AA IMPAYE / COMMANDE PROJET
   var e = rg_devine_(tiers);
   if (e) return e;
   return '';   // aucune étiquette existante : pas de création automatique, Pierre choisit avec « Ranger »
