@@ -432,6 +432,8 @@ function carte(f){
       d.slice(0, 4).map(function(x){ return '• ' + esc(x.quoi) + ' <span class="meta">(' + esc(x.pourquoi) + ')</span>'; }).join('<br>') + '</div>' : ''; })() || '') +
     (f['Date application'] ? (/^↩/.test(f['Date application'])
         ? '<div class="meta">' + esc(f['Date application']) + '</div>'
+        : /^🗑/.test(f['Date application'])
+        ? '<div class="meta">' + esc(f['Date application']) + ' (récupérable 30 jours) · <a href="#" onclick="restaurer(\'' + id + '\');return false">↩ restaurer</a></div>'
         : '<div class="meta">🗂 Rangé dans « ' + esc(f['Étiquette finale']) + ' » le ' + esc(f['Date application']) + ' (sorti de la boîte de réception) · ' +
           '<a href="#" onclick="desranger(\'' + id + '\');return false">↩ remettre en boîte de réception</a></div>') : '') +
     (f['Réponse envoyée'] ? (/^⏰/.test(f['Réponse envoyée'])
@@ -445,7 +447,8 @@ function carte(f){
     '<div class="actions">' +
       '<button class="b-voir" onclick="voirMail(\'' + id + '\')">' + (/^C-/.test(f['ID']) ? '📮 Voir le courrier' : '📄 Voir le mail') + '</button>' +
       '<button class="b-voir" onclick="repondre(\'' + id + '\')">✉️ Répondre' + (f['Réponse proposée'] ? ' (texte prêt)' : '') + '</button>' +
-      (/^C-/.test(f['ID']) || (f['Date application'] && !/^↩/.test(f['Date application'])) ? '' : '<button class="b-voir" onclick="ranger(\'' + id + '\')">🗂 Ranger</button>') +
+      (/^C-/.test(f['ID']) || (f['Date application'] && !/^↩/.test(f['Date application'])) ? '' : '<button class="b-voir" onclick="ranger(\'' + id + '\')">🗂 Ranger</button>' +
+        '<button class="b-voir" onclick="supprimerMail(\'' + id + '\')">🗑 Supprimer</button>') +
       (traite
         ? '<button class="b-corr" onclick="decider(\'' + id + '\',\'À valider\')">↩︎ Annuler ma décision</button>'
         : '<button class="b-ok" onclick="decider(\'' + id + '\',\'Validé\')">✓ D\'accord</button>' +
@@ -490,6 +493,15 @@ function confirmerRanger(id){
   });
 }
 
+function supprimerMail(id){
+  var f = trouver(id);
+  if (!confirm('Mettre ce mail à la corbeille, sans étiquette ?\n« ' + (f['Objet'] || f['Tiers'] || '') + ' »\n\nIl reste récupérable 30 jours dans la Corbeille de Gmail (bouton « ↩ restaurer » sur la fiche).')) return;
+  appel('mob_corbeille', [JETON, id], function(r){ f['Date application'] = r.note; afficher(); }, function(m){ alert('Non effectué : ' + m); });
+}
+function restaurer(id){
+  var f = trouver(id);
+  appel('mob_restaurer', [JETON, id], function(r){ f['Date application'] = r.note; afficher(); }, function(m){ alert('Non effectué : ' + m); });
+}
 function desranger(id){
   var f = trouver(id);
   if (!confirm('Remettre ce mail dans la boîte de réception ?\nL\'étiquette « ' + (f['Étiquette finale'] || '') + ' » sera retirée ; son statut lu / non lu ne change pas. Il ne sera plus rangé automatiquement.')) return;
