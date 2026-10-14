@@ -84,6 +84,10 @@
   .et{font-size:12px;padding:3px 7px;border-radius:12px;background:#eef0f3;color:var(--doux)}
   .et.fait{background:#e3f5ea;color:var(--vert);font-weight:600}
   .com{white-space:pre-wrap;margin-top:4px}
+  .prio{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:var(--doux)}
+  .prio .pp{width:34px;height:30px;border:1px solid var(--bord);border-radius:8px;background:#fff;font-weight:700;font-size:15px}
+  .prio .pp.on{background:var(--rouge);color:#fff;border-color:var(--rouge)}
+  .pp-b{background:var(--rouge);color:#fff;margin-right:4px}
   .pagecr{display:flex;align-items:center;gap:8px;margin:6px 0}
   .pagecr img{width:64px;height:84px;object-fit:cover;border-radius:6px;border:1px solid var(--bord)}
   .pdfcr{width:64px;height:84px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;border:1px solid var(--bord);border-radius:6px;overflow:hidden}
@@ -178,7 +182,7 @@ var FAIRE = {
   'Sans intérêt': "Rien à faire. Appuyez sur « D'accord »."
 };
 function lib(d){ return LIB[d] || d; }
-function rang(f){ var r = ORDRE[f['Priorité']]; return r === undefined ? 9 : r; }
+function rang(f){ var pp = Number(f['Priorité Pierre']); if (pp >= 1 && pp <= 3) return pp - 10; var r = ORDRE[f['Priorité']]; return r === undefined ? 9 : r; }
 
 try { var j = JSON.parse(localStorage.getItem('triRJ_jeton') || 'null'); if (j && j.exp > Date.now()) JETON = j.v; } catch(e) {}
 if (JETON) { demarrer(); }
@@ -263,7 +267,7 @@ function carte(f){
     ? '<div class="meta">Étiquette actuelle : ' + esc(f['Étiquette actuelle']) + '</div>' : '';
   var traite = f['Statut'] !== 'À valider';
   return '<div class="carte">' +
-    '<div class="ligne1"><div><span class="badge p-' + esc(f['Priorité']) + '">' + esc(f['Priorité']) + '</span><span class="tiers">' + esc(f['Tiers']) + '</span>' +
+    '<div class="ligne1"><div>' + (f['Priorité Pierre'] ? '<span class="badge pp-b">N° ' + esc(f['Priorité Pierre']) + '</span>' : '') + '<span class="badge p-' + esc(f['Priorité']) + '">' + esc(f['Priorité']) + '</span><span class="tiers">' + esc(f['Tiers']) + '</span>' +
       '<div class="meta">' + esc(f['Type']) + ' · reçu le ' + esc(f['Date mail']) + (f['Références'] ? ' · ' + esc(f['Références']) : '') + '</div></div>' +
       '<div class="montant">' + esc(f['Montant TTC']) + '</div></div>' +
     '<div class="decision">Ma proposition : <b>' + esc(lib(f['Décision proposée'])) + '</b>' +
@@ -280,6 +284,9 @@ function carte(f){
         : '<div class="meta">✉️ Réponse : ' + esc(f['Réponse envoyée']) + '</div>') : '') +
     (traite ? '<div class="statut st-' + esc(f['Statut']) + '">' + esc(f['Statut']) + (f['Décision finale'] ? ' → ' + esc(lib(f['Décision finale'])) : '') +
       (f['Commentaire Pierre'] ? ' · « ' + esc(f['Commentaire Pierre']) + ' »' : '') + ' (' + esc(f['Date validation']) + ')</div>' : '') +
+    (traite ? '' : '<div class="prio">Ma priorité : ' + ['1', '2', '3'].map(function(n){
+        return '<button class="pp' + (f['Priorité Pierre'] === n ? ' on' : '') + '" onclick="priorite(\'' + id + '\',\'' + n + '\')">' + n + '</button>'; }).join('') +
+      (f['Priorité Pierre'] ? '<a href="#" onclick="priorite(\'' + id + '\',\'\');return false">retirer</a>' : '') + '</div>') +
     '<div class="actions">' +
       '<button class="b-voir" onclick="voirMail(\'' + id + '\')">' + (/^C-/.test(f['ID']) ? '📮 Voir le courrier' : '📄 Voir le mail') + '</button>' +
       '<button class="b-voir" onclick="repondre(\'' + id + '\')">✉️ Répondre' + (f['Réponse proposée'] ? ' (texte prêt)' : '') + '</button>' +
@@ -290,6 +297,13 @@ function carte(f){
     '</div></div>';
 }
 
+function priorite(id, n){
+  var f = trouver(id), avant = f['Priorité Pierre'] || '';
+  f['Priorité Pierre'] = (avant === n ? '' : n);
+  FICHES.sort(function(a,b){ return rang(a) - rang(b) || String(b['Date mail']).localeCompare(String(a['Date mail'])); });
+  afficher();
+  appel('mob_priorite', [JETON, id, f['Priorité Pierre']], function(){}, function(m){ f['Priorité Pierre'] = avant; afficher(); alert('Priorité non enregistrée : ' + m); });
+}
 function trouver(id){ return FICHES.filter(function(f){ return f['ID'] === id; })[0]; }
 
 function decider(id, statut, decision, etiquette, commentaire){
