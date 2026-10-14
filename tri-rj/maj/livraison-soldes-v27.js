@@ -2,9 +2,9 @@
 
 /* =====================================================================
  * Livraison et soldes (v2.7 — 14/10/2026)
- * 1. Un dossier payé et clôturé reste visible (« 📦 Payés — en attente de livraison ») et ses mails restent
- *    dans la boîte de réception tant que la livraison n'est pas notée « 🟢 Livrée en totalité » ou « ⚪ Sans livraison attendue ».
- *    Il n'est pas non plus archivé avant.
+ * 1. Un dossier payé et clôturé reste visible (« 📦 Payés — en attente de livraison ») et n'est pas archivé
+ *    tant que la livraison n'est pas notée « 🟢 Livrée en totalité » ou « ⚪ Sans livraison attendue ».
+ *    Ses mails, eux, sont rangés dès que le virement est fait et la preuve envoyée (rangement Gmail).
  * 2. Le solde de chaque banque est actualisé : solde saisi − virements effectués depuis cette saisie
  *    (versements enregistrés, ou dossiers validés par l'administrateur / clôturés sans versement enregistré).
  * ===================================================================== */

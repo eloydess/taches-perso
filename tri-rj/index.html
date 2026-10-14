@@ -1345,7 +1345,7 @@ function blocLivraison(){
   var l = TRESO.attenteLivraison || [];
   if (!l.length) return '';
   return '<h3 style="margin:16px 0 4px">📦 Payés — livraison à confirmer (' + l.length + ')</h3>' +
-    '<p class="meta">Leurs mails restent dans la boîte de réception tant que la livraison n\'est pas confirmée. Dès que vous indiquez « Livrée en totalité » ou « Sans livraison », le dossier peut être archivé et ses mails rangés.</p>' +
+    '<p class="meta">Virement fait et preuve envoyée : leurs mails sont rangés dans l\'étiquette du laboratoire (hors boîte de réception). Le dossier, lui, reste ici tant que la livraison n\'est pas confirmée ; dès « Livrée en totalité » ou « Sans livraison », il peut être archivé.</p>' +
     l.map(function(x, k){
       return '<div class="carte"><div class="ligne1"><span class="tiers">' + esc(x.tiers) + '</span><span class="montant">' + (x.montant != null ? eur(x.montant) : '') + '</span></div>' +
         '<div class="meta">' + esc(x.refs) + (x.preuve ? ' · 📨 preuve envoyée le ' + esc(x.preuve) : '') + '</div>' +
