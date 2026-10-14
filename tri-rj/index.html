@@ -380,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function(){ document.body.classLis
 document.body && document.body.classList.toggle('pc', ECRAN_PC);
 function barrePC(){
   return '<div class="barrePC"><input id="recherche" type="search" placeholder="🔎 Rechercher (labo, n° de facture, montant…)" value="' + esc(RECHERCHE) + '" oninput="RECHERCHE=this.value;afficher();var r=document.getElementById(\'recherche\');r.focus();r.setSelectionRange(r.value.length,r.value.length)">' +
-    '<div class="meta raccourcis">Clavier : <kbd>↑</kbd><kbd>↓</kbd> naviguer · <kbd>A</kbd> d\'accord · <kbd>C</kbd> changer · <kbd>M</kbd> voir le mail · <kbd>R</kbd> répondre · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> priorité</div></div>';
+    '<div class="meta raccourcis">Clavier : <kbd>↑</kbd><kbd>↓</kbd> naviguer · <kbd>A</kbd> d\'accord · <kbd>C</kbd> changer · <kbd>M</kbd> voir le mail · <kbd>R</kbd> répondre · <kbd>G</kbd> ranger · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> priorité</div></div>';
 }
 function lignePC(f){
   var d = f['Statut'] === 'À valider' ? doublons(f) : [];
@@ -405,6 +405,7 @@ document.addEventListener('keydown', function(e){
   else if (k === 'c' && f['Statut'] === 'À valider') corriger(SEL);
   else if (k === 'm') voirMail(SEL);
   else if (k === 'r') repondre(SEL);
+  else if (k === 'g' && !/^C-/.test(SEL) && !f['Date application']) ranger(SEL);
   else if (/^[123]$/.test(k) && f['Statut'] === 'À valider') priorite(SEL, k);
   else if (k === '/') { var r = document.getElementById('recherche'); if (r) { r.focus(); e.preventDefault(); } }
 });
@@ -429,6 +430,7 @@ function carte(f){
     (f['Incertitudes'] ? '<div class="incert">⚠️ ' + esc(f['Incertitudes']) + '</div>' : '') +
     (!traite && (function(){ var d = doublons(f); return d.length ? '<div class="doublon">♊ <b>Doublon possible</b> — ' + (d.some(function(x){ return x.suivi; }) ? 'déjà compté au suivi RJ, ne pas l\'ajouter une 2e fois' : 'même pièce qu\'une autre fiche : n\'en valider qu\'une') + ' :<br>' +
       d.slice(0, 4).map(function(x){ return '• ' + esc(x.quoi) + ' <span class="meta">(' + esc(x.pourquoi) + ')</span>'; }).join('<br>') + '</div>' : ''; })() || '') +
+    (f['Date application'] ? '<div class="meta">🗂 Rangé dans « ' + esc(f['Étiquette finale']) + ' » le ' + esc(f['Date application']) + ' (sorti de la boîte de réception)</div>' : '') +
     (f['Réponse envoyée'] ? (/^⏰/.test(f['Réponse envoyée'])
         ? '<div class="meta">' + esc(f['Réponse envoyée']) + ' <a href="#" onclick="annulerEnvoi(\'' + id + '\');return false">annuler l\'envoi</a></div>'
         : '<div class="meta">✉️ Réponse : ' + esc(f['Réponse envoyée']) + '</div>') : '') +
@@ -440,11 +442,49 @@ function carte(f){
     '<div class="actions">' +
       '<button class="b-voir" onclick="voirMail(\'' + id + '\')">' + (/^C-/.test(f['ID']) ? '📮 Voir le courrier' : '📄 Voir le mail') + '</button>' +
       '<button class="b-voir" onclick="repondre(\'' + id + '\')">✉️ Répondre' + (f['Réponse proposée'] ? ' (texte prêt)' : '') + '</button>' +
+      (/^C-/.test(f['ID']) || f['Date application'] ? '' : '<button class="b-voir" onclick="ranger(\'' + id + '\')">🗂 Ranger</button>') +
       (traite
         ? '<button class="b-corr" onclick="decider(\'' + id + '\',\'À valider\')">↩︎ Annuler ma décision</button>'
         : '<button class="b-ok" onclick="decider(\'' + id + '\',\'Validé\')">✓ D\'accord</button>' +
           '<button class="b-corr" onclick="corriger(\'' + id + '\')">✎ Changer / noter</button>') +
     '</div></div>';
+}
+
+/* ---------- Ranger un mail dans l'étiquette de son laboratoire (sort de la boîte de réception, lu / non lu inchangé) ---------- */
+var ETIQUETTES = null;
+function ranger(id){
+  var f = trouver(id);
+  document.getElementById('mTitre').textContent = 'Ranger — ' + f['Tiers'];
+  document.getElementById('mCorps').innerHTML = '<div class="chargement">Recherche de l\'étiquette…</div>';
+  ouvrir();
+  var suite = function(prop){
+    document.getElementById('mCorps').innerHTML =
+      '<p class="meta">Le mail sera rangé dans cette étiquette et sortira de la boîte de réception. Son statut lu / non lu ne change pas. Rien n\'est supprimé.</p>' +
+      '<div class="champ"><label>Étiquette' + (prop ? ' (proposée)' : ' — aucune trouvée automatiquement, choisissez-la') + '</label>' +
+      '<input id="rgE" list="rgL" value="' + esc(prop || '') + '" placeholder="ex. LABORATOIRES/ABBVIE"><datalist id="rgL">' +
+      (ETIQUETTES || []).map(function(e){ return '<option value="' + esc(e) + '">'; }).join('') + '</datalist>' +
+      '<div class="meta">Tapez quelques lettres du laboratoire pour voir la liste. Une étiquette qui n\'existe pas sera créée.</div></div>' +
+      '<div id="rgErr" class="erreur"></div>' +
+      '<div class="actions"><button class="btn b-voir" onclick="fermer()">Annuler</button><button id="rgOk" class="btn b-ok" onclick="confirmerRanger(\'' + esc(id) + '\')">🗂 Ranger maintenant</button></div>';
+  };
+  var prop = null, fini = 0;
+  var etape = function(){ if (++fini === 2) suite(prop); };
+  appel('mob_etiquettePourFiche', [JETON, id], function(r){ prop = r.proposee; etape(); }, function(){ etape(); });
+  if (ETIQUETTES) etape(); else appel('mob_etiquettes', [JETON], function(l){ ETIQUETTES = l; etape(); }, function(m){ ETIQUETTES = []; etape(); });
+}
+function confirmerRanger(id){
+  var e = document.getElementById('rgE').value.trim(), b = document.getElementById('rgOk'), err = document.getElementById('rgErr');
+  if (!e) { err.textContent = 'Choisissez une étiquette.'; return; }
+  if (ETIQUETTES && ETIQUETTES.indexOf(e) < 0 && !confirm('L\'étiquette « ' + e + ' » n\'existe pas encore : la créer ?')) return;
+  b.disabled = true; b.textContent = 'Rangement…';
+  appel('mob_ranger', [JETON, id, e], function(r){
+    var f = trouver(id); f['Étiquette finale'] = r.etiquette; f['Date application'] = r.date;
+    if (ETIQUETTES && ETIQUETTES.indexOf(e) < 0) ETIQUETTES.push(e);
+    fermer(); afficher();
+  }, function(m){
+    err.textContent = /403|insufficient|scope|autoris/i.test(m) ? 'Le rangement n\'est pas encore autorisé par Google (autorisation à accepter dans l\'éditeur Apps Script).' : m;
+    b.disabled = false; b.textContent = '🗂 Réessayer';
+  });
 }
 
 function priorite(id, n){
