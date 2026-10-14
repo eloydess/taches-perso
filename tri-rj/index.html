@@ -72,6 +72,10 @@
   .opts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
   .opts input,.opts select{padding:7px;border:1px solid var(--bord);border-radius:8px;font-size:15px}
   .opts input{width:120px}
+  .etapes{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+  .et{font-size:12px;padding:3px 7px;border-radius:12px;background:#eef0f3;color:var(--doux)}
+  .et.fait{background:#e3f5ea;color:var(--vert);font-weight:600}
+  .com{white-space:pre-wrap;margin-top:4px}
   .choisi{border-color:var(--vert);box-shadow:0 0 0 1px var(--vert) inset}
   table.rj{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
   table.rj td,table.rj th{border-bottom:1px solid var(--bord);padding:6px;text-align:left;vertical-align:top}
@@ -564,11 +568,16 @@ function afficherTreso(){
       '<div class="corpsL"><div class="ligne1"><span class="tiers">' + esc(x.tiers) + '</span><span class="montant">' + eur(x.du) + '</span></div>' +
       '<div class="meta">' + esc(x.refs) + (x.date ? ' · ' + esc(x.date) : '') + '</div>' +
       '<div class="meta">' + esc(x.statut) + (x.source !== 'Fichier RJ' ? ' · 📬 ' + esc(x.source) : '') + '</div>' +
+      (x.source === 'Fichier RJ' ? '<div class="etapes">' + etape('📤 Demande', x.demande) + etape('✔ Validé', x.validation) + etape('📨 Preuve', x.preuve) + '</div>' +
+        (x.commentaire ? '<div class="meta com">' + esc(x.commentaire) + '</div>' : '') +
+        '<div class="opts"><button class="pj" onclick="dossier(' + i + ')">✏️ Mettre à jour le dossier</button>' +
+        (x.lien ? '<button class="pj" onclick="window.open(\'' + esc(x.lien) + '\',\'_blank\')">📧 Mail d\'origine</button>' : '') + '</div>' : '') +
       (x.choisi ? '<div class="opts"><input inputmode="decimal" value="' + esc(x.montantVir == null ? '' : x.montantVir.toFixed(2).replace('.', ',')) + '" onchange="changer(' + i + ', \'montantVir\', this.value)" aria-label="Montant à virer">' +
         '<select onchange="changer(' + i + ', \'banqueVir\', this.value)">' + ['CEBPL', 'BPGO'].map(function(b){ return '<option value="' + b + '"' + (x.banqueVir === b ? ' selected' : '') + '>' + NOMS_BANQUE[b] + '</option>'; }).join('') + '</select>' +
         '<select onchange="changer(' + i + ', \'priorite\', this.value)"><option value="">Priorité</option>' + [['1', '1 · Urgent'], ['2', '2 · Normal'], ['3', '3 · Plus tard']].map(function(p){ return '<option value="' + p[0] + '"' + (x.priorite === p[0] ? ' selected' : '') + '>' + p[1] + '</option>'; }).join('') + '</select></div>' : '') +
       '</div></div></div>';
   }).join('');
+  if (TRESO.clotures) h += '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="archiver()">📦 Ranger ' + TRESO.clotures + ' dossier(s) clôturé(s) dans les archives</button>';
   h += '<p class="meta">Source : ' + esc(TRESO.source) + '. Mis à jour : ' + esc(TRESO.maj) + '.</p>';
   document.getElementById('treso').innerHTML = h;
 }
@@ -582,6 +591,58 @@ function changer(i, champ, v){
   var x = TRESO.lignes[i];
   if (champ === 'montantVir') { var n = nb(v); if (n == null || n < 0) { afficherTreso(); return; } x.montantVir = n; } else x[champ] = v;
   sauverLigne(x); afficherTreso();
+}
+
+function etape(nom, date){ return '<span class="et' + (date ? ' fait' : '') + '">' + nom + (date ? ' ' + esc(date.slice(0, 5)) : '') + '</span>'; }
+function versISO(d){ var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(d || ''); return m ? m[3] + '-' + m[2] + '-' + m[1] : ''; }
+function aujourdhui(){ var d = new Date(); return d.getFullYear() + '-' + deuxChiffres(d.getMonth() + 1) + '-' + deuxChiffres(d.getDate()); }
+var DOSSIER = null;
+function dossier(i){
+  var x = TRESO.lignes[i]; DOSSIER = i;
+  var champDate = function(id, label, val, aide){
+    return '<div class="champ"><label>' + label + '</label><div style="display:flex;gap:6px"><input id="' + id + '" type="date" value="' + versISO(val) + '" style="flex:1">' +
+      '<button class="pj" onclick="document.getElementById(\'' + id + '\').value=aujourdhui()">Aujourd\'hui</button>' +
+      '<button class="pj" onclick="document.getElementById(\'' + id + '\').value=\'\'">Effacer</button></div>' + (aide ? '<div class="meta">' + aide + '</div>' : '') + '</div>';
+  };
+  document.getElementById('mTitre').textContent = x.tiers + ' — ' + (x.refs || 'dossier');
+  document.getElementById('mCorps').innerHTML =
+    '<p class="meta">' + esc(x.statut) + '</p>' +
+    '<div class="champ"><label>Montant TTC (€)</label><input id="dM" inputmode="decimal" value="' + esc(x.du == null ? '' : x.du.toFixed(2).replace('.', ',')) + '"></div>' +
+    champDate('dF', 'Date de la facture / réception', x.dateFacture, '') +
+    champDate('dI', '📤 Demande de virement envoyée à l\'administrateur', x.demande, '') +
+    champDate('dJ', '✔ Validation de l\'administrateur', x.validation, '') +
+    champDate('dK', '📨 Preuve de virement renvoyée au laboratoire', x.preuve, 'Une fois cette date remplie, le dossier est clôturé.') +
+    '<div class="champ"><label>Livraison</label><select id="dN"><option value=""></option>' +
+      ['⚪ Sans livraison attendue', '🔴 En attente de livraison', '🟠 Livrée partiellement', '🟢 Livrée en totalité'].map(function(o){ return '<option' + (x.livraison === o ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></div>' +
+    '<div class="champ"><label>Commentaires</label><textarea id="dC" rows="4">' + esc(x.commentaire) + '</textarea></div>' +
+    (x.contacts ? '<div class="meta" style="white-space:pre-wrap">' + esc(x.contacts) + '</div>' : '') +
+    '<div id="dErr" class="erreur"></div>' +
+    '<button id="dOk" class="btn b-ok" style="width:100%;margin-top:8px" onclick="enregistrerDossier()">Enregistrer</button>';
+  ouvrir();
+}
+function enregistrerDossier(){
+  var x = TRESO.lignes[DOSSIER], err = document.getElementById('dErr');
+  var m = document.getElementById('dM').value.trim();
+  if (m !== '' && (nb(m) == null || nb(m) < 0)) { err.textContent = 'Montant invalide.'; return; }
+  var avant = { montant: x.du == null ? '' : x.du, facture: versISO(x.dateFacture), demande: versISO(x.demande), validation: versISO(x.validation),
+    preuve: versISO(x.preuve), livraison: x.livraison || '', commentaire: x.commentaire || '' };
+  var apres = { montant: m === '' ? '' : nb(m), facture: document.getElementById('dF').value, demande: document.getElementById('dI').value,
+    validation: document.getElementById('dJ').value, preuve: document.getElementById('dK').value,
+    livraison: document.getElementById('dN').value, commentaire: document.getElementById('dC').value };
+  var aFaire = Object.keys(apres).filter(function(k){ return String(apres[k]) !== String(avant[k]); });
+  if (!aFaire.length) { fermer(); return; }
+  var b = document.getElementById('dOk'); b.disabled = true; b.textContent = 'Enregistrement…';
+  var suite = function(){
+    if (!aFaire.length) { fermer(); chargerTreso(); return; }
+    var k = aFaire.shift();
+    appel('mob_majDossier', [JETON, x.cle, k, k === 'montant' && apres[k] !== '' ? String(apres[k]) : apres[k]], suite,
+      function(msg){ err.textContent = 'Non enregistré (' + k + ') : ' + msg; b.disabled = false; b.textContent = 'Réessayer'; chargerTreso(); });
+  };
+  suite();
+}
+function archiver(){
+  if (!confirm('Ranger les dossiers clôturés (preuve renvoyée) dans l\'onglet Archives ?')) return;
+  appel('mob_archiver', [JETON], function(r){ alert(r.nb + ' dossier(s) rangé(s) dans les archives.'); chargerTreso(); }, function(m){ alert(m); });
 }
 
 function saisirSolde(b){
