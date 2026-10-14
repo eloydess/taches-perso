@@ -84,6 +84,7 @@
   .et{font-size:12px;padding:3px 7px;border-radius:12px;background:#eef0f3;color:var(--doux)}
   .et.fait{background:#e3f5ea;color:var(--vert);font-weight:600}
   .com{white-space:pre-wrap;margin-top:4px}
+  .verse{color:#2948a3}
   .prio{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:var(--doux)}
   .prio .pp{width:34px;height:30px;border:1px solid var(--bord);border-radius:8px;background:#fff;font-weight:700;font-size:15px}
   .prio .pp.on{background:var(--rouge);color:#fff;border-color:var(--rouge)}
@@ -618,6 +619,7 @@ function afficherTreso(){
       '<input type="checkbox"' + (x.choisi ? ' checked' : '') + ' onchange="cocher(' + i + ', this.checked)">' +
       '<div class="corpsL"><div class="ligne1"><span class="tiers">' + esc(x.tiers) + '</span><span class="montant">' + eur(x.du) + '</span></div>' +
       '<div class="meta">' + esc(x.refs) + (x.date ? ' · ' + esc(x.date) : '') + '</div>' +
+      (x.verse ? '<div class="meta verse">💶 Facture ' + eur(x.montantTTC) + ' · déjà versé ' + eur(x.verse) + ' (' + x.versements.length + ' fois) · <b>reste ' + eur(x.du) + '</b></div>' : '') +
       '<div class="meta">' + esc(x.statut) + (x.source !== 'Fichier RJ' ? ' · 📬 ' + esc(x.source) : '') + '</div>' +
       (x.source === 'Fichier RJ' ? '<div class="etapes">' + etape('📤 Demande', x.demande) + etape('✔ Validé', x.validation) + etape('📨 Preuve', x.preuve) + '</div>' +
         (x.commentaire ? '<div class="meta com">' + esc(x.commentaire) + '</div>' : '') +
@@ -658,7 +660,7 @@ function dossier(i){
   document.getElementById('mTitre').textContent = x.tiers + ' — ' + (x.refs || 'dossier');
   document.getElementById('mCorps').innerHTML =
     '<p class="meta">' + esc(x.statut) + '</p>' +
-    '<div class="champ"><label>Montant TTC (€)</label><input id="dM" inputmode="decimal" value="' + esc(x.du == null ? '' : x.du.toFixed(2).replace('.', ',')) + '"></div>' +
+    '<div class="champ"><label>Montant TTC (€)</label><input id="dM" inputmode="decimal" value="' + esc((x.montantTTC !== undefined ? x.montantTTC : x.du) == null ? '' : (x.montantTTC !== undefined ? x.montantTTC : x.du).toFixed(2).replace('.', ',')) + '"></div>' +
     champDate('dF', 'Date de la facture / réception', x.dateFacture, '') +
     champDate('dI', '📤 Demande de virement envoyée à l\'administrateur', x.demande, '') +
     champDate('dJ', '✔ Validation de l\'administrateur', x.validation, '') +
@@ -668,14 +670,61 @@ function dossier(i){
     '<div class="champ"><label>Commentaires</label><textarea id="dC" rows="4">' + esc(x.commentaire) + '</textarea></div>' +
     (x.contacts ? '<div class="meta" style="white-space:pre-wrap">' + esc(x.contacts) + '</div>' : '') +
     '<div id="dErr" class="erreur"></div>' +
+    (x.versements ? blocVersements(x) : '') +
     '<button id="dOk" class="btn b-ok" style="width:100%;margin-top:8px" onclick="enregistrerDossier()">Enregistrer</button>';
   ouvrir();
 }
+function recapVersements(x){
+  var t = x.tiers + ' — ' + (x.refs || 'dossier') + ' : montant ' + eur(x.montantTTC) + '.';
+  x.versements.forEach(function(v){ t += '\nVersé ' + eur(v.montant) + ' le ' + v.date + '.'; });
+  t += '\nReste dû : ' + eur(x.du) + '.';
+  return t;
+}
+function blocVersements(x){
+  return '<div class="carte" style="margin-top:12px;background:#f8f9fb"><b>💶 Paiement en plusieurs fois</b>' +
+    '<div class="meta">Montant du dossier : ' + eur(x.montantTTC) + ' · déjà versé : ' + eur(x.verse) + ' · <b>reste dû : ' + eur(x.du) + '</b></div>' +
+    (x.versements.length ? x.versements.map(function(v){
+      return '<div class="ligne1" style="margin-top:6px"><span>' + esc(v.date) + ' — ' + eur(v.montant) + (v.banque ? ' <span class="meta">(' + esc(v.banque.split(' ')[0]) + ')</span>' : '') +
+        (v.note ? '<div class="meta">' + esc(v.note) + '</div>' : '') + '</span>' +
+        '<a href="#" onclick="supprimerVersement(' + v.ligne + ');return false">supprimer</a></div>';
+    }).join('') : '<div class="meta" style="margin-top:6px">Aucun versement enregistré.</div>') +
+    '<div class="opts" style="margin-top:8px"><input id="vD" type="date" value="' + aujourdhui() + '" style="width:150px">' +
+      '<input id="vM" inputmode="decimal" placeholder="Montant €" value="' + esc(x.du == null ? '' : x.du.toFixed(2).replace('.', ',')) + '">' +
+      '<select id="vB">' + ["CEBPL (Caisse d'Épargne)", 'BPGO (Banque Populaire)'].map(function(b){ return '<option' + (b.indexOf(x.banqueVir === 'BPGO' ? 'BPGO' : 'CEBPL') === 0 ? ' selected' : '') + '>' + b + '</option>'; }).join('') + '</select></div>' +
+    '<div class="champ" style="margin:6px 0"><input id="vN" placeholder="Note (ex. 2e échéance sur 4)"></div>' +
+    '<div id="vErr" class="erreur"></div>' +
+    '<button id="vOk" class="btn b-ok" style="width:100%" onclick="ajouterVersement()">➕ Enregistrer ce versement</button>' +
+    (x.versements.length ? '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="copierRecap()">📋 Copier le récapitulatif (pour un mail)</button>' : '') +
+    '</div>';
+}
+function ajouterVersement(){
+  var x = TRESO.lignes[DOSSIER], err = document.getElementById('vErr'), b = document.getElementById('vOk');
+  var m = nb(document.getElementById('vM').value), d = document.getElementById('vD').value;
+  if (m == null || m <= 0) { err.textContent = 'Montant invalide.'; return; }
+  if (!d) { err.textContent = 'Choisissez la date du versement.'; return; }
+  b.disabled = true; b.textContent = 'Enregistrement…';
+  appel('mob_versement', [JETON, x.cle, d, String(m), document.getElementById('vB').value, document.getElementById('vN').value], function(){
+    fermer(); chargerTreso();
+  }, function(msg){ err.textContent = msg; b.disabled = false; b.textContent = '➕ Enregistrer ce versement'; });
+}
+function supprimerVersement(ligne){
+  if (!confirm('Supprimer ce versement (saisie erronée) ?')) return;
+  var x = TRESO.lignes[DOSSIER];
+  appel('mob_supprimerVersement', [JETON, x.cle, ligne], function(){ fermer(); chargerTreso(); }, function(m){ alert(m); });
+}
+function copierRecap(){
+  var t = recapVersements(TRESO.lignes[DOSSIER]);
+  var ok = function(){ alert('Récapitulatif copié :\n\n' + t); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, function(){ prompt('Copiez ce texte :', t); });
+  else prompt('Copiez ce texte :', t);
+}
+
 function enregistrerDossier(){
   var x = TRESO.lignes[DOSSIER], err = document.getElementById('dErr');
   var m = document.getElementById('dM').value.trim();
   if (m !== '' && (nb(m) == null || nb(m) < 0)) { err.textContent = 'Montant invalide.'; return; }
-  var avant = { montant: x.du == null ? '' : x.du, facture: versISO(x.dateFacture), demande: versISO(x.demande), validation: versISO(x.validation),
+  var mt = x.montantTTC !== undefined ? x.montantTTC : x.du;
+  var avant = { montant: mt == null ? '' : mt, facture: versISO(x.dateFacture), demande: versISO(x.demande), validation: versISO(x.validation),
     preuve: versISO(x.preuve), livraison: x.livraison || '', commentaire: x.commentaire || '' };
   var apres = { montant: m === '' ? '' : nb(m), facture: document.getElementById('dF').value, demande: document.getElementById('dI').value,
     validation: document.getElementById('dJ').value, preuve: document.getElementById('dK').value,
