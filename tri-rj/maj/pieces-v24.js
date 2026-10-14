@@ -166,13 +166,37 @@ function pc_source_(d) {
   var m = /thread-f:(\d+)/.exec(lien);
   if (m) return pc_decHex_(m[1]);
   m = /#[a-z]+\/([0-9a-f]{16})\b/.exec(lien);
-  return m ? m[1] : '';
+  if (m) return m[1];
+  return pc_chercherMail_(d.l[3]);
+}
+
+/** Dossier sans lien : cherche dans Gmail un mail avec pièce jointe qui cite le n° de facture / proforma / commande. */
+function pc_chercherMail_(refs) {
+  var texte = String(refs || '');
+  var codes = {};
+  (texte.match(/(?:client|compte|cc)\b[^A-Za-z0-9]{0,12}([A-Z0-9][A-Z0-9-]{4,})/gi) || []).forEach(function (x) {
+    var mm = /([A-Z0-9][A-Z0-9-]{4,})$/i.exec(x); if (mm) codes[mm[1].toUpperCase()] = 1;
+  });
+  var jetons = (texte.toUpperCase().match(/[A-Z0-9][A-Z0-9-]{4,}/g) || []).filter(function (t) {
+    return (t.match(/\d/g) || []).length >= 5 && !codes[t];
+  });
+  for (var i = 0; i < jetons.length && i < 3; i++) {
+    var fils = GmailApp.search('"' + jetons[i] + '" has:attachment -in:drafts newer_than:180d', 0, 5);
+    for (var j = 0; j < fils.length; j++) {
+      var aPdf = fils[j].getMessages().some(function (msg) {
+        return msg.getAttachments({ includeInlineImages: false }).some(function (a) { return /pdf/i.test(a.getContentType()) || /\.pdf$/i.test(a.getName() || ''); });
+      });
+      if (aPdf) return fils[j].getId() + '|' + jetons[i];
+    }
+  }
+  return '';
 }
 
 /** Retrouve la facture du dossier et la range dans ses pièces. Renvoie le nombre de fichiers ajoutés. */
 function pc_factureAuto_(d) {
-  var src = pc_source_(d);
+  var src = pc_source_(d), cite = '';
   if (!src) return 0;
+  if (src.indexOf('|') > 0) { cite = src.split('|')[1]; src = src.split('|')[0]; }
   if (/^C-/.test(src)) {
     var cr = cr_feuille_(), n = cr.getLastRow() - 1;
     if (n < 1) return 0;
@@ -186,7 +210,12 @@ function pc_factureAuto_(d) {
   try { fil = GmailApp.getThreadById(src); } catch (e) { fil = null; }
   if (!fil) return 0;
   var pjs = [];
-  fil.getMessages().forEach(function (msg) {
+  var msgs = fil.getMessages();
+  if (cite) {   // fil trouvé par recherche : on garde les messages qui citent ce n° (un fil peut contenir plusieurs factures)
+    var cibles = msgs.filter(function (msg) { return (msg.getSubject() + ' ' + msg.getPlainBody()).toUpperCase().indexOf(cite) >= 0; });
+    if (cibles.length) msgs = cibles;
+  }
+  msgs.forEach(function (msg) {
     msg.getAttachments({ includeInlineImages: false }).forEach(function (a) {
       var nom = a.getName() || '';
       if (!/pdf/i.test(a.getContentType()) && !/\.pdf$/i.test(nom)) return;
