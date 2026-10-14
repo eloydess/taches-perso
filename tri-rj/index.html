@@ -979,16 +979,18 @@ function blocVersements(x){
   return '<div class="carte" style="margin-top:12px;background:#f8f9fb"><b>💶 Paiement en plusieurs fois</b>' +
     '<div class="meta">Montant du dossier : ' + eur(x.montantTTC) + ' · déjà versé : ' + eur(x.verse) + ' · <b>reste dû : ' + eur(x.du) + '</b></div>' +
     (x.versements.length ? x.versements.map(function(v){
-      return '<div class="ligne1" style="margin-top:6px"><span>' + esc(v.date) + ' — ' + eur(v.montant) + (v.banque ? ' <span class="meta">(' + esc(v.banque.split(' ')[0]) + ')</span>' : '') +
+      return '<div class="ligne1" style="margin-top:6px"><span>' + esc(String(v.date).replace(/\s+\d{1,2}:\d{2}(:\d{2})?$/, '')) + ' — ' + eur(v.montant) + (v.banque ? ' <span class="meta">(' + esc(v.banque.split(' ')[0]) + ')</span>' : '') +
         (v.note ? '<div class="meta">' + esc(v.note) + '</div>' : '') + '</span>' +
         '<a href="#" onclick="supprimerVersement(' + v.ligne + ');return false">supprimer</a></div>';
     }).join('') : '<div class="meta" style="margin-top:6px">Aucun versement enregistré.</div>') +
-    '<div class="opts" style="margin-top:8px"><input id="vD" type="date" value="' + aujourdhui() + '" style="width:150px">' +
+    (x.du != null && x.du <= 0 && x.versements.length
+      ? '<div class="verif" style="margin-top:8px">✅ <b>Facture payée en totalité</b> : le virement est déjà enregistré, il n\'y a rien à ajouter ici. Étape suivante : joignez la preuve de virement ci-dessous, puis « Envoyer la preuve ».</div>'
+      : '<div class="opts" style="margin-top:8px"><input id="vD" type="date" value="' + aujourdhui() + '" style="width:150px">' +
       '<input id="vM" inputmode="decimal" placeholder="Montant €" value="' + esc(x.du == null ? '' : x.du.toFixed(2).replace('.', ',')) + '">' +
       '<select id="vB">' + ["CEBPL (Caisse d'Épargne)", 'BPGO (Banque Populaire)'].map(function(b){ return '<option' + (b.indexOf(x.banqueVir === 'BPGO' ? 'BPGO' : 'CEBPL') === 0 ? ' selected' : '') + '>' + b + '</option>'; }).join('') + '</select></div>' +
     '<div class="champ" style="margin:6px 0"><input id="vN" placeholder="Note (ex. 2e échéance sur 4)"></div>' +
     '<div id="vErr" class="erreur"></div>' +
-    '<button id="vOk" class="btn b-ok" style="width:100%" onclick="ajouterVersement()">➕ Enregistrer ce versement</button>' +
+    '<button id="vOk" class="btn b-ok" style="width:100%" onclick="ajouterVersement()">➕ Enregistrer ce versement</button>') +
     (x.versements.length ? '<button class="btn b-voir" style="width:100%;margin-top:6px" onclick="copierRecap()">📋 Copier le récapitulatif (pour un mail)</button>' : '') +
     '</div>';
 }
