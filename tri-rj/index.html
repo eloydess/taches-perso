@@ -131,7 +131,7 @@
 <div id="connexion">
   <h2>🔒 Pharmacie — Tri & RJ</h2>
   <p>Code d'accès</p>
-  <input id="code" type="password" inputmode="numeric" maxlength="6" autocomplete="off">
+  <input id="code" type="password" inputmode="numeric" maxlength="12" autocomplete="off" onkeydown="if(event.key==='Enter')connexion()">
   <button class="btn" onclick="connexion()">Entrer</button>
   <div id="errConn" class="erreur"></div>
 </div>
@@ -243,8 +243,9 @@ function appel(fn, args, ok, ko){
 }
 
 function connexion(){
-  var code = document.getElementById('code').value;
-  document.getElementById('errConn').textContent = '';
+  var code = document.getElementById('code').value.replace(/\s/g, '');
+  document.getElementById('errConn').textContent = code ? 'Connexion…' : 'Tapez le code.';
+  if (!code) return;
   appel('mob_connexion', [code], function(j){
     JETON = j; try { localStorage.setItem('triRJ_jeton', JSON.stringify({ v: j, exp: Date.now() + 5.5*3600*1000 })); } catch(e) {}
     demarrer();
