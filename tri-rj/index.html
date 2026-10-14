@@ -380,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function(){ document.body.classLis
 document.body && document.body.classList.toggle('pc', ECRAN_PC);
 function barrePC(){
   return '<div class="barrePC"><input id="recherche" type="search" placeholder="🔎 Rechercher (labo, n° de facture, montant…)" value="' + esc(RECHERCHE) + '" oninput="RECHERCHE=this.value;afficher();var r=document.getElementById(\'recherche\');r.focus();r.setSelectionRange(r.value.length,r.value.length)">' +
-    '<div class="meta raccourcis">Clavier : <kbd>↑</kbd><kbd>↓</kbd> naviguer · <kbd>A</kbd> d\'accord · <kbd>C</kbd> changer · <kbd>M</kbd> voir le mail · <kbd>R</kbd> répondre · <kbd>G</kbd> ranger · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> priorité</div></div>';
+    '<div class="meta raccourcis">Clavier : <kbd>↑</kbd><kbd>↓</kbd> naviguer · <kbd>A</kbd> d\'accord · <kbd>C</kbd> changer · <kbd>M</kbd> voir le mail · <kbd>R</kbd> répondre · <kbd>G</kbd> ranger · <kbd>S</kbd> supprimer · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> priorité</div></div>';
 }
 function lignePC(f){
   var d = f['Statut'] === 'À valider' ? doublons(f) : [];
@@ -406,6 +406,7 @@ document.addEventListener('keydown', function(e){
   else if (k === 'm') voirMail(SEL);
   else if (k === 'r') repondre(SEL);
   else if (k === 'g' && !/^C-/.test(SEL) && (!f['Date application'] || /^↩/.test(f['Date application']))) ranger(SEL);
+  else if ((k === 's' || e.key === 'Delete') && !/^C-/.test(SEL) && !/^🗑/.test(f['Date application'] || '')) supprimerMail(SEL);
   else if (/^[123]$/.test(k) && f['Statut'] === 'À valider') priorite(SEL, k);
   else if (k === '/') { var r = document.getElementById('recherche'); if (r) { r.focus(); e.preventDefault(); } }
 });
@@ -447,8 +448,8 @@ function carte(f){
     '<div class="actions">' +
       '<button class="b-voir" onclick="voirMail(\'' + id + '\')">' + (/^C-/.test(f['ID']) ? '📮 Voir le courrier' : '📄 Voir le mail') + '</button>' +
       '<button class="b-voir" onclick="repondre(\'' + id + '\')">✉️ Répondre' + (f['Réponse proposée'] ? ' (texte prêt)' : '') + '</button>' +
-      (/^C-/.test(f['ID']) || (f['Date application'] && !/^↩/.test(f['Date application'])) ? '' : '<button class="b-voir" onclick="ranger(\'' + id + '\')">🗂 Ranger</button>' +
-        '<button class="b-voir" onclick="supprimerMail(\'' + id + '\')">🗑 Supprimer</button>') +
+      (/^C-/.test(f['ID']) || (f['Date application'] && !/^↩/.test(f['Date application'])) ? '' : '<button class="b-voir" onclick="ranger(\'' + id + '\')">🗂 Ranger</button>') +
+      (/^C-/.test(f['ID']) || /^🗑/.test(f['Date application'] || '') ? '' : '<button class="b-voir" onclick="supprimerMail(\'' + id + '\')">🗑 Supprimer</button>') +
       (traite
         ? '<button class="b-corr" onclick="decider(\'' + id + '\',\'À valider\')">↩︎ Annuler ma décision</button>'
         : '<button class="b-ok" onclick="decider(\'' + id + '\',\'Validé\')">✓ D\'accord</button>' +
@@ -731,6 +732,7 @@ function voirMail(id){
         '<pre>' + esc(m.corps) + '</pre></div>';
     }).join('');
     h += '<button class="btn b-ok" style="width:100%;margin-bottom:8px" onclick="repondre(MAIL_ID)">✉️ Répondre depuis l\'application</button>';
+    if (!/^🗑/.test(f['Date application'] || '')) h += '<button class="btn b-voir" style="width:100%;margin-bottom:8px" onclick="fermer();supprimerMail(MAIL_ID)">🗑 Supprimer ce mail (corbeille, récupérable 30 jours)</button>';
     h += '<p style="font-size:13px;color:#667085">Ou <a href="#" onclick="ouvrirGmail();return false">ouvrir dans Gmail</a> (le mail sera alors marqué comme lu).</p>';
     document.getElementById('mCorps').innerHTML = h;
   }, function(m){ document.getElementById('mCorps').innerHTML = '<div class="erreur">' + esc(m) + '</div>'; });
