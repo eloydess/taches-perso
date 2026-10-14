@@ -95,6 +95,8 @@
   .choisi{border-color:var(--vert);box-shadow:0 0 0 1px var(--vert) inset}
   table.rj{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
   table.rj td,table.rj th{border-bottom:1px solid var(--bord);padding:6px;text-align:left;vertical-align:top}
+.zonecolle{margin-top:8px;padding:14px;border:2px dashed #9aa5b1;border-radius:10px;text-align:center;color:#5f6b7a;font-size:14px;min-height:22px;outline:none;-webkit-user-select:text;user-select:text}
+.zonecolle:focus{border-color:#1a73e8;color:#1a73e8}
 </style>
 </head>
 <body>
@@ -113,7 +115,7 @@
     <div class="onglets">
       <button id="oMail" class="actif" onclick="vue('mail')">📬 Boîte mail</button>
       <button id="oRJ" onclick="vue('rj')">💶 Paiements RJ</button>
-      <button id="oCR" onclick="vue('cr')">📮 Courrier</button>
+      <button id="oCR" onclick="vue('cr')">📮 Courrier / PDF</button>
     </div>
   </header>
   <div class="bandeau">Mode test : vos décisions sont enregistrées, Gmail n'est pas modifié et les mails restent dans leur état lu / non lu.</div>
@@ -127,10 +129,13 @@
     </section>
     <section id="vCR" style="display:none">
       <div class="carte">
-        <b>📮 Scanner un courrier reçu par la poste</b>
-        <p class="meta">Prenez chaque page en photo (ou choisissez un PDF). Claude lit le courrier, prépare une fiche dans « Boîte mail » et, s'il y a un paiement, il s'ajoute au suivi RJ dès que vous validez.</p>
+        <b>📮 Envoyer un courrier ou un document à Claude</b>
+        <p class="meta">Photo d'un courrier, PDF enregistré ou document copié dans une autre application. Claude le lit, prépare une fiche dans « Boîte mail » et, s'il y a un paiement, il s'ajoute au suivi RJ dès que vous validez.</p>
         <div class="champ"><label>Note (facultatif)</label><input id="crNote" placeholder="ex. Facture Orkyn reçue ce matin"></div>
-        <label class="btn b-voir" style="display:block;text-align:center;cursor:pointer">📷 Ajouter des pages<input id="crFic" type="file" accept="image/*,application/pdf" multiple style="display:none" onchange="ajouterPages(this)"></label>
+        <label class="btn b-voir" style="display:block;text-align:center;cursor:pointer">📷 Prendre une photo<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="ajouterPages(this)"></label>
+        <label class="btn b-voir" style="display:block;text-align:center;cursor:pointer;margin-top:8px">📄 Choisir un PDF ou une image enregistrés<input id="crFic" type="file" accept="application/pdf,image/*" multiple style="display:none" onchange="ajouterPages(this)"></label>
+        <button class="btn b-voir" style="width:100%;margin-top:8px" onclick="collerBouton()">📋 Coller le document copié</button>
+        <div id="crColle" class="zonecolle" contenteditable="true" spellcheck="false" aria-label="Zone pour coller un document">… ou appuyez longuement ici, puis « Coller »</div>
         <div id="crPages" style="margin-top:8px"></div>
         <div id="crErr" class="erreur"></div>
         <button id="crOk" class="btn b-ok" style="width:100%;margin-top:8px;display:none" onclick="envoyerCourrier()">Envoyer pour analyse</button>
@@ -850,34 +855,91 @@ function reduireImage(fichier, fin){
 }
 function ajouterPages(input){
   var fichiers = Array.prototype.slice.call(input.files || []); input.value = '';
+  ajouterFichiers(fichiers);
+}
+var NB_COLLES = 0;
+function ajouterFichiers(fichiers){
   var err = document.getElementById('crErr'); err.textContent = '';
+  var refuses = [];
   var suite = function(){
-    if (!fichiers.length) { afficherPages(); return; }
+    if (!fichiers.length) {
+      if (refuses.length) err.textContent = 'Format non accepté (PDF ou image uniquement) : ' + refuses.join(', ');
+      afficherPages(); return;
+    }
     var f = fichiers.shift();
-    if (PAGES.length >= 12) { err.textContent = '12 pages au maximum par courrier.'; afficherPages(); return; }
-    if (/pdf/i.test(f.type)) {
+    if (PAGES.length >= 12) { err.textContent = '12 pages ou documents au maximum par envoi.'; afficherPages(); return; }
+    var nom = f.name || '';
+    if (/pdf/i.test(f.type) || /\.pdf$/i.test(nom)) {
+      if (!nom) nom = 'document colle ' + (++NB_COLLES) + '.pdf';
       var l = new FileReader();
-      l.onload = function(){ PAGES.push({ nom: f.name, type: 'application/pdf', b64: String(l.result).split(',')[1], apercu: '' }); suite(); };
+      l.onload = function(){ PAGES.push({ nom: nom, type: 'application/pdf', b64: String(l.result).split(',')[1], apercu: '' }); suite(); };
       l.readAsDataURL(f);
-    } else reduireImage(f, function(p){ PAGES.push(p); suite(); });
+    } else if (/^image\//i.test(f.type)) {
+      reduireImage(f, function(p){ if (!f.name) p.nom = 'image collee ' + (++NB_COLLES) + '.jpg'; PAGES.push(p); suite(); });
+    } else { refuses.push(nom || f.type || 'inconnu'); suite(); }
   };
   suite();
+}
+/* Coller : appui long dans la zone (ou n'importe où dans l'onglet Courrier) puis « Coller », ou bouton « Coller ». */
+function fichiersDuPressePapier(dt){
+  var res = [];
+  if (!dt) return res;
+  Array.prototype.forEach.call(dt.items || [], function(it){ if (it.kind === 'file') { var f = it.getAsFile(); if (f) res.push(f); } });
+  if (!res.length) Array.prototype.forEach.call(dt.files || [], function(f){ res.push(f); });
+  return res;
+}
+document.addEventListener('beforeinput', function(e){
+  if (e.target && e.target.id === 'crColle' && e.inputType !== 'insertFromPaste') e.preventDefault();
+});
+document.addEventListener('paste', function(e){
+  var vue = document.getElementById('vCR');
+  if (!vue || vue.style.display === 'none') return;
+  var cible = e.target;
+  var fichiers = fichiersDuPressePapier(e.clipboardData);
+  if (!fichiers.length && cible && /^(INPUT|TEXTAREA)$/.test(cible.tagName)) return;   // coller du texte dans la note : normal
+  e.preventDefault();
+  var zone = document.getElementById('crColle');
+  zone.textContent = '… ou appuyez longuement ici, puis « Coller »';
+  if (fichiers.length) { ajouterFichiers(fichiers); return; }
+  document.getElementById('crErr').textContent = 'Le presse-papiers ne contient pas de document (seulement du texte ou un lien). ' +
+    'Dans l\'application d\'origine, utilisez plutôt « Partager » → « Enregistrer dans Fichiers », puis « Choisir un PDF ».';
+});
+function collerBouton(){
+  var err = document.getElementById('crErr'); err.textContent = '';
+  if (!navigator.clipboard || !navigator.clipboard.read) {
+    err.textContent = 'Votre navigateur ne permet pas ce bouton : appuyez longuement dans la zone en pointillés, puis « Coller ».';
+    document.getElementById('crColle').focus(); return;
+  }
+  navigator.clipboard.read().then(function(elements){
+    var promesses = [];
+    elements.forEach(function(el){
+      var type = el.types.filter(function(t){ return t === 'application/pdf'; })[0] || el.types.filter(function(t){ return /^image\//.test(t); })[0];
+      if (type) promesses.push(el.getType(type).then(function(b){ return new File([b], '', { type: type }); }));
+    });
+    return Promise.all(promesses);
+  }).then(function(fichiers){
+    if (fichiers.length) ajouterFichiers(fichiers);
+    else { err.textContent = 'Aucun document dans le presse-papiers. Essayez l\'appui long dans la zone en pointillés, puis « Coller ».'; document.getElementById('crColle').focus(); }
+  }).catch(function(){
+    err.textContent = 'Accès au presse-papiers refusé : appuyez longuement dans la zone en pointillés, puis « Coller ».';
+    document.getElementById('crColle').focus();
+  });
 }
 function afficherPages(){
   document.getElementById('crPages').innerHTML = PAGES.map(function(p, i){
     return '<div class="pagecr">' + (p.apercu ? '<img src="' + p.apercu + '">' : '<div class="pdfcr">📄 ' + esc(p.nom) + '</div>') +
-      '<button class="pj" onclick="PAGES.splice(' + i + ',1);afficherPages()">✕ Retirer</button><span class="meta">Page ' + (i + 1) + '</span></div>';
-  }).join('') + (PAGES.length ? '<p class="meta">' + PAGES.length + ' page(s) · ' + Math.ceil(poidsPages() / 1024) + ' Ko</p>' : '');
+      '<button class="pj" onclick="PAGES.splice(' + i + ',1);afficherPages()">✕ Retirer</button><span class="meta">' + (p.type === 'application/pdf' ? 'Document ' : 'Page ') + (i + 1) + '</span></div>';
+  }).join('') + (PAGES.length ? '<p class="meta">' + PAGES.length + ' élément(s) · ' + Math.ceil(poidsPages() / 1024) + ' Ko</p>' : '');
   document.getElementById('crOk').style.display = PAGES.length ? 'block' : 'none';
 }
 function envoyerCourrier(){
   var err = document.getElementById('crErr'), b = document.getElementById('crOk');
-  if (poidsPages() > 20 * 1024 * 1024) { err.textContent = 'Photos trop lourdes (20 Mo au maximum).'; return; }
+  if (poidsPages() > 20 * 1024 * 1024) { err.textContent = 'Fichiers trop lourds (20 Mo au maximum par envoi).'; return; }
   b.disabled = true; b.textContent = 'Envoi en cours…';
   appel('mob_courrier', [JETON, PAGES.map(function(p){ return { nom: p.nom, type: p.type, b64: p.b64 }; }), document.getElementById('crNote').value], function(r){
     PAGES = []; document.getElementById('crNote').value = ''; afficherPages();
     b.disabled = false; b.textContent = 'Envoyer pour analyse';
-    err.innerHTML = '<span class="pos">✓ Courrier enregistré (' + r.pages + ' page(s)). Claude l\'analysera au prochain passage.</span>';
+    err.innerHTML = '<span class="pos">✓ Envoyé (' + r.pages + ' élément(s)). Claude l\'analysera au prochain passage.</span>';
     chargerCourriers();
   }, function(m){ err.textContent = m; b.disabled = false; b.textContent = 'Réessayer'; });
 }
